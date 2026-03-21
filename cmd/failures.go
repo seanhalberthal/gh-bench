@@ -132,7 +132,7 @@ func printFailuresText(results []runner.RunResult) error {
 					fmt.Printf("  ✗ %s\n", f.TestName)
 				}
 				if f.Message != "" {
-					for _, line := range strings.Split(f.Message, "\n") {
+					for line := range strings.SplitSeq(f.Message, "\n") {
 						fmt.Printf("      %s\n", line)
 					}
 				}

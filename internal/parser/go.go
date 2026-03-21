@@ -30,7 +30,7 @@ func (g *GoParser) Extract(logs string) []Failure {
 	lines := strings.Split(logs, "\n")
 	var failures []Failure
 
-	for i := 0; i < len(lines); i++ {
+	for i := range lines {
 		match := goFailRe.FindStringSubmatch(lines[i])
 		if match == nil {
 			continue

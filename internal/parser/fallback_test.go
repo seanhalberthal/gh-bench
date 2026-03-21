@@ -54,7 +54,7 @@ func TestFallbackParser_Extract_ShortLogs(t *testing.T) {
 
 func TestFallbackParser_Extract_LongLogs(t *testing.T) {
 	var lines []string
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		lines = append(lines, "log line")
 	}
 	logs := strings.Join(lines, "\n")
