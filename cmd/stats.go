@@ -28,6 +28,7 @@ func init() {
 	statsCmd.Flags().String("branch", "", "Filter runs by branch")
 	statsCmd.Flags().String("agg", "median", "Aggregations: median, mean, p95, min, max (comma-separated)")
 	statsCmd.Flags().Int("concurrency", 5, "Number of concurrent log fetchers")
+	statsCmd.Flags().String("match", "first", "Which matches to extract per run: first, all")
 }
 
 func runStats(cmd *cobra.Command, args []string) error {
@@ -45,6 +46,7 @@ func runStats(cmd *cobra.Command, args []string) error {
 	aggFlag, _ := cmd.Flags().GetString("agg")
 	concurrency, _ := cmd.Flags().GetInt("concurrency")
 	jsonOutput, _ := cmd.Flags().GetBool("json")
+	matchFlag, _ := cmd.Flags().GetString("match")
 
 	pattern, err := resolvePatternFlag(patternFlag, presetFlag)
 	if err != nil {
@@ -75,7 +77,8 @@ func runStats(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("fetching logs: %w", err)
 	}
 
-	values, err := runner.ExtractValues(results, pattern)
+	matchAll := matchFlag == "all"
+	values, err := runner.ExtractValues(results, pattern, matchAll)
 	if err != nil {
 		return fmt.Errorf("extracting values: %w", err)
 	}

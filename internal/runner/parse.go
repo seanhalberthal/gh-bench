@@ -88,8 +88,10 @@ func (ev ExtractedValues) Numbers() []float64 {
 	return nums
 }
 
-// ExtractValues applies a named capture group regex to each run's log and extracts numeric values.
-func ExtractValues(results []RunResult, pattern string) (ExtractedValues, error) {
+// ExtractValues applies a named capture group regex to each run's log
+// and extracts numeric values. When matchAll is true, all matches per
+// run are returned (not just the first).
+func ExtractValues(results []RunResult, pattern string, matchAll bool) (ExtractedValues, error) {
 	re, err := regexp.Compile(pattern)
 	if err != nil {
 		return nil, fmt.Errorf("compiling pattern %q: %w", pattern, err)
@@ -111,22 +113,27 @@ func ExtractValues(results []RunResult, pattern string) (ExtractedValues, error)
 
 	var values ExtractedValues
 	for _, r := range results {
-		match := findFirstMatch(re, r.Log, groupIdx)
-		if match == "" {
-			continue
+		var matches []string
+		if matchAll {
+			matches = findAllMatches(re, r.Log, groupIdx)
+		} else {
+			if m := findFirstMatch(re, r.Log, groupIdx); m != "" {
+				matches = []string{m}
+			}
 		}
 
-		num, err := strconv.ParseFloat(match, 64)
-		if err != nil {
-			return nil, fmt.Errorf("value %q from run %d is not numeric: %w", match, r.RunID, err)
+		for _, match := range matches {
+			num, err := strconv.ParseFloat(match, 64)
+			if err != nil {
+				return nil, fmt.Errorf("value %q from run %d is not numeric: %w", match, r.RunID, err)
+			}
+			values = append(values, ExtractedValue{
+				RunID: r.RunID,
+				Title: r.Title,
+				Raw:   match,
+				Value: num,
+			})
 		}
-
-		values = append(values, ExtractedValue{
-			RunID: r.RunID,
-			Title: r.Title,
-			Raw:   match,
-			Value: num,
-		})
 	}
 
 	return values, nil
@@ -141,4 +148,16 @@ func findFirstMatch(re *regexp.Regexp, log string, groupIdx int) string {
 		}
 	}
 	return ""
+}
+
+// findAllMatches returns every match of the regex's named group across all lines.
+func findAllMatches(re *regexp.Regexp, log string, groupIdx int) []string {
+	var results []string
+	for line := range strings.SplitSeq(log, "\n") {
+		match := re.FindStringSubmatch(line)
+		if match != nil && groupIdx < len(match) {
+			results = append(results, match[groupIdx])
+		}
+	}
+	return results
 }
