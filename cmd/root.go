@@ -25,7 +25,19 @@ func init() {
 	rootCmd.AddCommand(statsCmd)
 	rootCmd.AddCommand(failuresCmd)
 
-	rootCmd.PersistentFlags().Bool("json", false, "Output as JSON")
+	rootCmd.PersistentFlags().String("format", "table", "Output format: table, json, csv")
+	rootCmd.PersistentFlags().Bool("json", false, "Output as JSON (shorthand for --format json)")
+	rootCmd.PersistentFlags().MarkHidden("json")
+}
+
+// resolveFormat returns the output format from --format / --json flags.
+func resolveFormat(cmd *cobra.Command) string {
+	format, _ := cmd.Flags().GetString("format")
+	jsonFlag, _ := cmd.Flags().GetBool("json")
+	if jsonFlag {
+		return "json"
+	}
+	return format
 }
 
 // Execute runs the root command.

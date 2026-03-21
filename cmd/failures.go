@@ -32,7 +32,6 @@ func runFailures(cmd *cobra.Command, args []string) error {
 	limit, _ := cmd.Flags().GetInt("limit")
 	branch, _ := cmd.Flags().GetString("branch")
 	concurrency, _ := cmd.Flags().GetInt("concurrency")
-	jsonOutput, _ := cmd.Flags().GetBool("json")
 
 	if workflow == "" && runsFlag == "" {
 		return fmt.Errorf("either --workflow or --runs is required")
@@ -81,10 +80,14 @@ func runFailures(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(os.Stderr, "warning: %d failed runs found but no structured failures extracted (framework not detected?)\n", len(results))
 	}
 
-	if jsonOutput {
+	switch resolveFormat(cmd) {
+	case "json":
 		return printFailuresJSON(results)
+	case "csv":
+		return printFailuresCSV(results)
+	default:
+		return printFailuresText(results)
 	}
-	return printFailuresText(results)
 }
 
 func printFailuresJSON(results []runner.RunResult) error {
@@ -121,6 +124,25 @@ func printFailuresJSON(results []runner.RunResult) error {
 		return err
 	}
 	fmt.Println(string(data))
+	return nil
+}
+
+func printFailuresCSV(results []runner.RunResult) error {
+	fmt.Println("run_id,title,date,step,framework,test_name,message,location")
+	for _, r := range results {
+		for _, step := range r.FailedSteps {
+			failures := parser.Parse(step.Log)
+			fw := "unknown"
+			if len(failures) > 0 {
+				fw = failures[0].Framework
+			}
+			for _, f := range failures {
+				fmt.Printf("%d,%q,%q,%q,%q,%q,%q,%q\n",
+					r.RunID, r.Title, r.Date, step.Name,
+					fw, f.TestName, f.Message, f.Location)
+			}
+		}
+	}
 	return nil
 }
 

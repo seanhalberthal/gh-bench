@@ -45,7 +45,6 @@ func runStats(cmd *cobra.Command, args []string) error {
 	branch, _ := cmd.Flags().GetString("branch")
 	aggFlag, _ := cmd.Flags().GetString("agg")
 	concurrency, _ := cmd.Flags().GetInt("concurrency")
-	jsonOutput, _ := cmd.Flags().GetBool("json")
 	matchFlag, _ := cmd.Flags().GetString("match")
 
 	pattern, err := resolvePatternFlag(patternFlag, presetFlag)
@@ -92,10 +91,14 @@ func runStats(cmd *cobra.Command, args []string) error {
 	aggs := strings.Split(aggFlag, ",")
 	aggResults := stats.Compute(values.Numbers(), aggs)
 
-	if jsonOutput {
+	switch resolveFormat(cmd) {
+	case "json":
 		return printStatsJSON(values, aggResults)
+	case "csv":
+		return printStatsCSV(values, aggResults)
+	default:
+		return printStatsTable(values, aggResults)
 	}
-	return printStatsTable(values, aggResults)
 }
 
 func parseRunIDs(s string) ([]int64, error) {
@@ -140,6 +143,14 @@ func printStatsJSON(values runner.ExtractedValues, aggs map[string]float64) erro
 	}
 	fmt.Println("  }")
 	fmt.Println("}")
+	return nil
+}
+
+func printStatsCSV(values runner.ExtractedValues, _ map[string]float64) error {
+	fmt.Println("run_id,title,value")
+	for _, v := range values {
+		fmt.Printf("%d,%q,%s\n", v.RunID, v.Title, v.Raw)
+	}
 	return nil
 }
 
