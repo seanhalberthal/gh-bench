@@ -1,0 +1,30 @@
+2026-03-20T12:19:23.6149055Z     echo "Backend tests failed"
+2026-03-20T12:19:23.6150012Z     exit 1
+2026-03-20T12:19:23.6150843Z   fi
+2026-03-20T12:19:23.6151651Z   if [ "success" != "success" ]; then
+2026-03-20T12:19:23.6152795Z     echo "Backend formatting check failed"
+2026-03-20T12:19:23.6154066Z     exit 1
+2026-03-20T12:19:23.6154840Z   fi
+2026-03-20T12:19:23.6155635Z   if [ "success" != "success" ]; then
+2026-03-20T12:19:23.6156810Z     echo "Web formatting check failed"
+2026-03-20T12:19:23.6157820Z     exit 1
+2026-03-20T12:19:23.6158578Z   fi
+2026-03-20T12:19:23.6159481Z   if [ "success" != "success" ]; then
+2026-03-20T12:19:23.6160497Z     echo "Web tests failed"
+2026-03-20T12:19:23.6161413Z     exit 1
+2026-03-20T12:19:23.6162187Z   fi
+2026-03-20T12:19:23.6163033Z   echo "All PR CI checks passed"
+2026-03-20T12:19:23.6164189Z fi
+2026-03-20T12:19:23.6915051Z shell: /usr/bin/bash -e {0}
+2026-03-20T12:19:23.6916922Z env:
+2026-03-20T12:19:23.6917776Z   DOTNET_NOLOGO: true
+2026-03-20T12:19:23.6918646Z   DOTNET_CLI_TELEMETRY_OPTOUT: true
+2026-03-20T12:19:23.6919638Z   GCP_REGION: europe-west2
+2026-03-20T12:19:23.6920450Z   ARTIFACT_REGISTRY: europe-west2-docker.pkg.dev
+2026-03-20T12:19:23.6921636Z   GCP_PROJECT_ID: dana-artefacts
+2026-03-20T12:19:23.6922897Z   DOCKER_REGISTRY: europe-west2-docker.pkg.dev/dana-artefacts/dana-containers
+2026-03-20T12:19:23.6944806Z   IMAGE_NAME: dana-api
+2026-03-20T12:19:23.6945757Z   CI_ARTEFACTS_BUCKET: dana-ci-artefacts
+2026-03-20T12:19:23.6946788Z ##[endgroup]
+2026-03-20T12:19:23.7192702Z Backend tests failed
+2026-03-20T12:19:23.7214670Z ##[error]Process completed with exit code 1.

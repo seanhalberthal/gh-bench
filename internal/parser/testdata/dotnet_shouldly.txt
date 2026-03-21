@@ -1,0 +1,16 @@
+Starting test execution, please wait...
+A total of 2 test files matched the specified pattern.
+
+  Passed Dana.IntegrationTests.TokenManagement.User.Feature.ExchangeCodeForTokensIntegrationTests.ExchangeCodeForTokens_ReturnsOk [823ms]
+  Failed Dana.IntegrationTests.TokenManagement.User.Feature.ExchangeCodeForTokensIntegrationTests.ExchangeCodeForTokens_ReturnsBadRequest_WhenWrongAuthProvider(data: Tuple ("Microsoft 365", "generalErrors", InternalServerError, "Microsoft365-001 Token exchange ", "Microsoft 365 authentication fai")) [1 s]
+  Error Message:
+   Shouldly.ShouldAssertException : errors[0].Reason
+    should start with
+"Microsoft 365 authentication fai"
+    but was
+"An unexpected error occurred. Contact support and provide id: 019d0b28-a960-79cb-ab88-37c42410efb0"
+  Stack Trace:
+     at Dana.IntegrationTests.TokenManagement.User.Feature.ExchangeCodeForTokensIntegrationTests.ExchangeCodeForTokens_ReturnsBadRequest_WhenWrongAuthProvider(ValueTuple`5 data) in /home/runner/work/dana/dana/backend/test/integration/TokenManagement/User/Feature/ExchangeCodeForTokensIntegrationTests.cs:line 181
+   at System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw()
+
+Failed!  - Failed:     1, Passed:    84, Skipped:     0, Total:    85, Duration: 45.678 s

@@ -99,9 +99,74 @@ func TestExtractStepLog_MatchesPrefix(t *testing.T) {
 func TestExtractStepLog_NoMatch(t *testing.T) {
 	fullLog := "some random log output"
 	result := extractStepLog(fullLog, "test", "Run tests")
-	// Should fall back to full log
+	// No tabs, so stripAllPrefixes returns lines as-is
 	if result != fullLog {
 		t.Errorf("expected full log fallback, got: %q", result)
+	}
+}
+
+func TestExtractStepLog_NoMatch_StripsPrefixes(t *testing.T) {
+	// When step name doesn't match any discovered prefix, the fallback
+	// should still strip job\tstep\t prefixes from all lines.
+	fullLog := "job1\tUNKNOWN STEP\tline 1\njob1\tUNKNOWN STEP\tline 2"
+	result := extractStepLog(fullLog, "job1", "Run tests")
+	if result != "line 1\nline 2" {
+		t.Errorf("expected prefixes stripped in fallback, got: %q", result)
+	}
+}
+
+func TestExtractStepLog_JobNameMismatch(t *testing.T) {
+	// Simulates API returning display name "Test Summary" while log uses YAML key "test-summary"
+	fullLog := "test-summary\tRun tests\tline 1\ntest-summary\tRun tests\tline 2\ntest-summary\tSetup\tsetup line"
+	result := extractStepLog(fullLog, "Test Summary", "Run tests")
+	// Should match by step name even though job name differs
+	if result != "line 1\nline 2" {
+		t.Errorf("expected fuzzy match on step name, got: %q", result)
+	}
+}
+
+func TestExtractStepLog_CaseInsensitive(t *testing.T) {
+	fullLog := "ci\trun Tests\tline 1\nci\trun Tests\tline 2"
+	result := extractStepLog(fullLog, "ci", "Run Tests")
+	if result != "line 1\nline 2" {
+		t.Errorf("expected case-insensitive match, got: %q", result)
+	}
+}
+
+func TestDiscoverPrefixes(t *testing.T) {
+	lines := []string{
+		"job1\tstep1\tcontent",
+		"job1\tstep1\tmore content",
+		"job1\tstep2\tother content",
+		"job2\tstep3\tdifferent job",
+		"no tabs here",
+	}
+	prefixes := discoverPrefixes(lines)
+	if len(prefixes) != 3 {
+		t.Fatalf("expected 3 unique prefixes, got %d: %v", len(prefixes), prefixes)
+	}
+}
+
+func TestShouldSkipStep(t *testing.T) {
+	tests := []struct {
+		name string
+		skip bool
+	}{
+		{"Set up job", true},
+		{"Complete job", true},
+		{"Post Run actions/checkout@v4", true},
+		{"Post Run actions/cache@v3", true},
+		{"Initialize containers", true},
+		{"Run tests", false},
+		{"Run integration-platform tests", false},
+		{"Build", false},
+		{"Check CI status", false},
+	}
+
+	for _, tt := range tests {
+		if got := shouldSkipStep(tt.name); got != tt.skip {
+			t.Errorf("shouldSkipStep(%q) = %v, want %v", tt.name, got, tt.skip)
+		}
 	}
 }
 

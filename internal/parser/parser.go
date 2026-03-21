@@ -1,5 +1,25 @@
 package parser
 
+import "strings"
+
+// stripTimestamp removes a GitHub Actions timestamp prefix from a log line.
+// e.g. "2026-03-20T12:15:15.1234567Z   content" → "  content"
+func stripTimestamp(line string) string {
+	if len(line) < 28 {
+		return line
+	}
+	// Quick check: timestamps start with a digit and contain 'T' and 'Z'.
+	if line[0] < '0' || line[0] > '9' {
+		return line
+	}
+	// Find the 'Z' that ends the timestamp.
+	idx := strings.IndexByte(line, 'Z')
+	if idx < 20 || idx > 35 {
+		return line
+	}
+	return line[idx+1:]
+}
+
 // Failure represents a single test failure extracted from CI logs.
 type Failure struct {
 	TestName  string `json:"test_name"`

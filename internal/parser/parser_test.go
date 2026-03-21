@@ -8,8 +8,8 @@ func TestParse_DotnetDetected(t *testing.T) {
 	if len(failures) == 0 {
 		t.Fatal("expected failures to be extracted from dotnet logs")
 	}
-	if failures[0].Framework != "xUnit" {
-		t.Errorf("expected framework 'xUnit', got %q", failures[0].Framework)
+	if failures[0].Framework != "dotnet" {
+		t.Errorf("expected framework 'dotnet', got %q", failures[0].Framework)
 	}
 }
 
@@ -55,8 +55,8 @@ func TestParse_EmptyLogs(t *testing.T) {
 
 func TestDetectFramework_DotNet(t *testing.T) {
 	logs := readTestData(t, "dotnet_xunit.txt")
-	if fw := DetectFramework(logs); fw != "xUnit" {
-		t.Errorf("expected 'xUnit', got %q", fw)
+	if fw := DetectFramework(logs); fw != "dotnet" {
+		t.Errorf("expected 'dotnet', got %q", fw)
 	}
 }
 
@@ -92,7 +92,7 @@ FAIL	some/package	0.5s`
 		t.Fatal("expected at least one failure")
 	}
 	// Dotnet parser is first in the list and should detect first
-	if failures[0].Framework != "xUnit" {
-		t.Errorf("expected 'xUnit' (first match wins), got %q", failures[0].Framework)
+	if failures[0].Framework != "dotnet" {
+		t.Errorf("expected 'dotnet' (first match wins), got %q", failures[0].Framework)
 	}
 }
