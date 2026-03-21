@@ -29,6 +29,7 @@ func init() {
 	statsCmd.Flags().String("agg", "median", "Aggregations: median, mean, p95, min, max (comma-separated)")
 	statsCmd.Flags().Int("concurrency", 5, "Number of concurrent log fetchers")
 	statsCmd.Flags().String("match", "first", "Which matches to extract per run: first, all")
+	statsCmd.Flags().String("step", "", "Filter logs to a specific step name (substring match)")
 }
 
 func runStats(cmd *cobra.Command, args []string) error {
@@ -46,6 +47,7 @@ func runStats(cmd *cobra.Command, args []string) error {
 	aggFlag, _ := cmd.Flags().GetString("agg")
 	concurrency, _ := cmd.Flags().GetInt("concurrency")
 	matchFlag, _ := cmd.Flags().GetString("match")
+	stepFlag, _ := cmd.Flags().GetString("step")
 
 	pattern, err := resolvePatternFlag(patternFlag, presetFlag)
 	if err != nil {
@@ -61,6 +63,7 @@ func runStats(cmd *cobra.Command, args []string) error {
 		Branch:      branch,
 		Limit:       limit,
 		Concurrency: concurrency,
+		Step:        stepFlag,
 	}
 
 	if runsFlag != "" {
