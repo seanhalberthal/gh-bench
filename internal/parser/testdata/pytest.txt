@@ -1,0 +1,42 @@
+2026-03-20T12:15:15.1234567Z ============================= test session starts ==============================
+2026-03-20T12:15:15.1234567Z platform linux -- Python 3.12.2, pytest-8.1.1, pluggy-1.4.0
+2026-03-20T12:15:15.1234567Z rootdir: /home/runner/work/myproject/myproject
+2026-03-20T12:15:15.1234567Z configfile: pyproject.toml
+2026-03-20T12:15:15.1234567Z collected 142 items
+2026-03-20T12:15:15.1234567Z
+2026-03-20T12:15:16.1234567Z tests/test_auth.py ..F.                                                [ 10%]
+2026-03-20T12:15:17.1234567Z tests/test_api.py .....F..                                             [ 30%]
+2026-03-20T12:15:18.1234567Z tests/test_models.py ................                                   [ 50%]
+2026-03-20T12:15:19.1234567Z tests/test_utils.py ........F...                                       [ 70%]
+2026-03-20T12:15:20.1234567Z tests/test_views.py ....................                                [100%]
+2026-03-20T12:15:20.1234567Z
+2026-03-20T12:15:20.1234567Z =================================== FAILURES ===================================
+2026-03-20T12:15:20.1234567Z ___________________________ test_login_with_expired_token ___________________________
+2026-03-20T12:15:20.1234567Z
+2026-03-20T12:15:20.1234567Z     def test_login_with_expired_token():
+2026-03-20T12:15:20.1234567Z         token = create_token(expired=True)
+2026-03-20T12:15:20.1234567Z >       assert authenticate(token) is None
+2026-03-20T12:15:20.1234567Z E       AssertionError: assert <User id=1> is None
+2026-03-20T12:15:20.1234567Z
+2026-03-20T12:15:20.1234567Z tests/test_auth.py:42: AssertionError
+2026-03-20T12:15:20.1234567Z ___________________________ TestAPIClient.test_retry_on_503 ___________________________
+2026-03-20T12:15:20.1234567Z
+2026-03-20T12:15:20.1234567Z     def test_retry_on_503(self):
+2026-03-20T12:15:20.1234567Z         client = APIClient(max_retries=3)
+2026-03-20T12:15:20.1234567Z >       response = client.get("/health")
+2026-03-20T12:15:20.1234567Z E       ConnectionError: Max retries exceeded
+2026-03-20T12:15:20.1234567Z
+2026-03-20T12:15:20.1234567Z tests/test_api.py:87: ConnectionError
+2026-03-20T12:15:20.1234567Z ___________________________ test_parse_date_edge_case ___________________________
+2026-03-20T12:15:20.1234567Z
+2026-03-20T12:15:20.1234567Z     def test_parse_date_edge_case():
+2026-03-20T12:15:20.1234567Z         result = parse_date("2026-02-29")
+2026-03-20T12:15:20.1234567Z >       assert result is not None
+2026-03-20T12:15:20.1234567Z E       AssertionError: assert None is not None
+2026-03-20T12:15:20.1234567Z
+2026-03-20T12:15:20.1234567Z tests/test_utils.py:156: AssertionError
+2026-03-20T12:15:20.1234567Z =========================== short test summary info ============================
+2026-03-20T12:15:20.1234567Z FAILED tests/test_auth.py::test_login_with_expired_token - AssertionError: assert <User id=1> is None
+2026-03-20T12:15:20.1234567Z FAILED tests/test_api.py::TestAPIClient::test_retry_on_503 - ConnectionError: Max retries exceeded
+2026-03-20T12:15:20.1234567Z FAILED tests/test_utils.py::test_parse_date_edge_case - AssertionError: assert None is not None
+2026-03-20T12:15:20.1234567Z ========================= 3 failed, 139 passed in 5.23s =========================
