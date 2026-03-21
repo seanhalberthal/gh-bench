@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/seanhalberthal/gh-bench/internal/parser"
@@ -56,6 +57,28 @@ func runFailures(cmd *cobra.Command, args []string) error {
 	results, err := runner.FetchLogs(cmd.Context(), opts)
 	if err != nil {
 		return fmt.Errorf("fetching logs: %w", err)
+	}
+
+	if len(results) == 0 {
+		fmt.Fprintf(os.Stderr, "warning: no failed runs found")
+		if workflow != "" {
+			fmt.Fprintf(os.Stderr, " for workflow %q", workflow)
+		}
+		if branch != "" {
+			fmt.Fprintf(os.Stderr, " on branch %q", branch)
+		}
+		fmt.Fprintln(os.Stderr)
+		return nil
+	}
+
+	totalFailures := 0
+	for _, r := range results {
+		for _, step := range r.FailedSteps {
+			totalFailures += len(parser.Parse(step.Log))
+		}
+	}
+	if totalFailures == 0 {
+		fmt.Fprintf(os.Stderr, "warning: %d failed runs found but no structured failures extracted (framework not detected?)\n", len(results))
 	}
 
 	if jsonOutput {

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -77,6 +78,12 @@ func runStats(cmd *cobra.Command, args []string) error {
 	values, err := runner.ExtractValues(results, pattern)
 	if err != nil {
 		return fmt.Errorf("extracting values: %w", err)
+	}
+
+	if len(values) == 0 {
+		fmt.Fprintf(os.Stderr, "warning: no values matched pattern %q across %d runs\n", pattern, len(results))
+		fmt.Fprintf(os.Stderr, "hint: check your regex has a named capture group (?P<name>...) and matches your log output\n")
+		return nil
 	}
 
 	aggs := strings.Split(aggFlag, ",")
