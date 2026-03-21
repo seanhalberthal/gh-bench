@@ -24,6 +24,7 @@ func init() {
 	failuresCmd.Flags().Int("limit", 5, "Max failed runs to fetch")
 	failuresCmd.Flags().String("branch", "", "Filter by branch")
 	failuresCmd.Flags().Int("concurrency", 5, "Number of concurrent log fetchers")
+	failuresCmd.Flags().Bool("group", false, "Group identical failures across runs")
 }
 
 func runFailures(cmd *cobra.Command, args []string) error {
@@ -32,6 +33,7 @@ func runFailures(cmd *cobra.Command, args []string) error {
 	limit, _ := cmd.Flags().GetInt("limit")
 	branch, _ := cmd.Flags().GetString("branch")
 	concurrency, _ := cmd.Flags().GetInt("concurrency")
+	groupFlag, _ := cmd.Flags().GetBool("group")
 
 	if workflow == "" && runsFlag == "" {
 		return fmt.Errorf("either --workflow or --runs is required")
@@ -78,6 +80,23 @@ func runFailures(cmd *cobra.Command, args []string) error {
 	}
 	if totalFailures == 0 {
 		fmt.Fprintf(os.Stderr, "warning: %d failed runs found but no structured failures extracted (framework not detected?)\n", len(results))
+	}
+
+	if groupFlag {
+		runFailures := make(map[int64][]parser.Failure)
+		for _, r := range results {
+			for _, step := range r.FailedSteps {
+				failures := parser.Parse(step.Log)
+				runFailures[r.RunID] = append(runFailures[r.RunID], failures...)
+			}
+		}
+		groups := parser.GroupFailures(runFailures)
+		switch resolveFormat(cmd) {
+		case "json":
+			return printGroupedJSON(groups, len(results))
+		default:
+			return printGroupedText(groups, len(results))
+		}
 	}
 
 	switch resolveFormat(cmd) {
@@ -188,5 +207,45 @@ func printFailuresText(results []runner.RunResult) error {
 			}
 		}
 	}
+	return nil
+}
+
+func printGroupedText(groups []parser.FailureGroup, totalRuns int) error {
+	if len(groups) == 0 {
+		fmt.Println("No failures found.")
+		return nil
+	}
+
+	fmt.Printf("Failure groups across %d runs (%d unique)\n\n", totalRuns, len(groups))
+
+	for _, g := range groups {
+		fmt.Printf("  ✗ %s  [%d/%d runs]\n", g.TestName, g.Count, totalRuns)
+		if g.Message != "" {
+			for line := range strings.SplitSeq(g.Message, "\n") {
+				fmt.Printf("      %s\n", line)
+			}
+		}
+		if g.Location != "" {
+			fmt.Printf("      at %s\n", g.Location)
+		}
+		fmt.Printf("      framework: %s\n", g.Framework)
+		fmt.Println()
+	}
+	return nil
+}
+
+func printGroupedJSON(groups []parser.FailureGroup, totalRuns int) error {
+	output := struct {
+		TotalRuns int                    `json:"total_runs"`
+		Groups    []parser.FailureGroup  `json:"groups"`
+	}{
+		TotalRuns: totalRuns,
+		Groups:    groups,
+	}
+	data, err := json.MarshalIndent(output, "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(data))
 	return nil
 }
