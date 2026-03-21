@@ -26,7 +26,13 @@ var (
 	// ##[error] lines — these carry the actual signal.
 	ghErrorRe = regexp.MustCompile(`^##\[error\](.+)`)
 	// Shell script source lines (expanded by set -x or ##[group] in GitHub Actions).
-	shellScriptRe = regexp.MustCompile(`^\s*(if\s+\[|then$|else$|fi$|done$|do$|exit\s+\d|echo\s+"[^"]*"$)`)
+	shellScriptRe = regexp.MustCompile(`^(if\s+\[|then$|else$|fi$|done$|do$|exit\s+\d|echo\s+"[^"]*"$|#\s)`)
+	// ANSI colour code escape sequences (e.g. [36;1m...[0m).
+	ansiEscapeRe = regexp.MustCompile(`^\[[\d;]+m`)
+	// GitHub Actions runner commands: [command]/usr/bin/git ...
+	ghCommandRe = regexp.MustCompile(`^\[command\]`)
+	// GitHub Actions cleanup/lifecycle lines.
+	ghCleanupRe = regexp.MustCompile(`^(Cleaning up orphan processes|Terminate orphan process:|Removing |Prepare all required actions|Complete job name:)`)
 )
 
 // isBoilerplate returns true for lines that are GitHub Actions infrastructure
@@ -46,6 +52,15 @@ func isBoilerplate(line string) bool {
 		return true
 	}
 	if shellScriptRe.MatchString(trimmed) {
+		return true
+	}
+	if ansiEscapeRe.MatchString(trimmed) {
+		return true
+	}
+	if ghCommandRe.MatchString(trimmed) {
+		return true
+	}
+	if ghCleanupRe.MatchString(trimmed) {
 		return true
 	}
 	// Generic GitHub Actions error that carries no information.
@@ -104,7 +119,10 @@ func (f *FallbackParser) Extract(logs string) []Failure {
 	msg := tail
 	if len(errorMsgs) > 0 {
 		msg = strings.Join(errorMsgs, "\n")
-		if tail != "" && tail != msg {
+		// Only append log tail if the error is something actionable.
+		// Cancellations and timeouts don't benefit from log context.
+		isCancellation := len(errorMsgs) == 1 && (errorMsgs[0] == "The operation was canceled." || strings.Contains(errorMsgs[0], "cancelled") || strings.Contains(errorMsgs[0], "timed out"))
+		if !isCancellation && tail != "" && tail != msg {
 			msg += "\n\n--- log tail ---\n" + tail
 		}
 	}

@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -9,14 +10,14 @@ func TestGetFailedSteps_SingleFailure(t *testing.T) {
 	stub.handlers["run view 100 --json jobs"] = `{
 		"jobs": [
 			{
-				"id": 1001,
+				"databaseId": 1001,
 				"name": "build",
 				"status": "completed",
 				"conclusion": "success",
 				"steps": []
 			},
 			{
-				"id": 1002,
+				"databaseId": 1002,
 				"name": "test",
 				"status": "completed",
 				"conclusion": "failure",
@@ -27,7 +28,8 @@ func TestGetFailedSteps_SingleFailure(t *testing.T) {
 			}
 		]
 	}`
-	stub.handlers["run view 100 --log --job 1002"] = "test\tRun tests\tFAIL: something went wrong\ntest\tRun tests\terror at line 42"
+	// API-style raw log (no tab prefixes).
+	stub.handlers["api repos/{owner}/{repo}/actions/jobs/1002/logs"] = "FAIL: something went wrong\nerror at line 42"
 
 	orig := Executor
 	Executor = stub
@@ -43,6 +45,47 @@ func TestGetFailedSteps_SingleFailure(t *testing.T) {
 	if steps[0].Name != "Run tests" {
 		t.Errorf("unexpected step name: %q", steps[0].Name)
 	}
+	if !strings.Contains(steps[0].Log, "FAIL: something went wrong") {
+		t.Errorf("expected log to contain failure output, got: %q", steps[0].Log)
+	}
+}
+
+func TestGetFailedSteps_FallsBackToRunView(t *testing.T) {
+	stub := newStubExecutor()
+	stub.handlers["run view 100 --json jobs"] = `{
+		"jobs": [
+			{
+				"databaseId": 1002,
+				"name": "test",
+				"status": "completed",
+				"conclusion": "failure",
+				"steps": [
+					{"name": "Run tests", "status": "completed", "conclusion": "failure", "number": 1}
+				]
+			}
+		]
+	}`
+	// API fails, fallback to gh run view --log --job
+	stub.handlers["run view 100 --log --job 1002"] = "test\tRun tests\tline 1\ntest\tRun tests\tline 2"
+
+	orig := Executor
+	Executor = stub
+	defer func() { Executor = orig }()
+
+	steps, err := GetFailedSteps(100)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(steps) != 1 {
+		t.Fatalf("expected 1 failed step, got %d", len(steps))
+	}
+	// Fallback should strip tab prefixes.
+	if strings.Contains(steps[0].Log, "test\t") {
+		t.Errorf("expected tab prefixes to be stripped, got: %q", steps[0].Log)
+	}
+	if !strings.Contains(steps[0].Log, "line 1") {
+		t.Errorf("expected content to be preserved, got: %q", steps[0].Log)
+	}
 }
 
 func TestGetFailedSteps_NoFailures(t *testing.T) {
@@ -50,7 +93,7 @@ func TestGetFailedSteps_NoFailures(t *testing.T) {
 	stub.handlers["run view 200 --json jobs"] = `{
 		"jobs": [
 			{
-				"id": 2001,
+				"databaseId": 2001,
 				"name": "build",
 				"status": "completed",
 				"conclusion": "success",
@@ -88,62 +131,48 @@ func TestGetFailedSteps_InvalidJSON(t *testing.T) {
 	}
 }
 
-func TestExtractStepLog_MatchesPrefix(t *testing.T) {
-	fullLog := "test\tRun tests\tline 1\ntest\tRun tests\tline 2\ntest\tSetup\tsetup line"
-	result := extractStepLog(fullLog, "test", "Run tests")
-	if result != "line 1\nline 2" {
+func TestGetFailedSteps_SkipsInfrastructureSteps(t *testing.T) {
+	stub := newStubExecutor()
+	stub.handlers["run view 500 --json jobs"] = `{
+		"jobs": [
+			{
+				"databaseId": 5001,
+				"name": "test",
+				"status": "completed",
+				"conclusion": "failure",
+				"steps": [
+					{"name": "Set up job", "status": "completed", "conclusion": "failure", "number": 1},
+					{"name": "Run tests", "status": "completed", "conclusion": "failure", "number": 2},
+					{"name": "Post Run actions/checkout@v4", "status": "completed", "conclusion": "failure", "number": 3},
+					{"name": "Complete job", "status": "completed", "conclusion": "failure", "number": 4}
+				]
+			}
+		]
+	}`
+	stub.handlers["api repos/{owner}/{repo}/actions/jobs/5001/logs"] = "test output"
+
+	orig := Executor
+	Executor = stub
+	defer func() { Executor = orig }()
+
+	steps, err := GetFailedSteps(500)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Only "Run tests" should remain — the others are infrastructure.
+	if len(steps) != 1 {
+		t.Fatalf("expected 1 step (infrastructure filtered), got %d", len(steps))
+	}
+	if steps[0].Name != "Run tests" {
+		t.Errorf("unexpected step: %q", steps[0].Name)
+	}
+}
+
+func TestStripLogPrefixes(t *testing.T) {
+	input := "job1\tStep1\tline 1\njob1\tStep1\tline 2\nno tabs here"
+	result := stripLogPrefixes(input)
+	if result != "line 1\nline 2\nno tabs here" {
 		t.Errorf("unexpected result: %q", result)
-	}
-}
-
-func TestExtractStepLog_NoMatch(t *testing.T) {
-	fullLog := "some random log output"
-	result := extractStepLog(fullLog, "test", "Run tests")
-	// No tabs, so stripAllPrefixes returns lines as-is
-	if result != fullLog {
-		t.Errorf("expected full log fallback, got: %q", result)
-	}
-}
-
-func TestExtractStepLog_NoMatch_StripsPrefixes(t *testing.T) {
-	// When step name doesn't match any discovered prefix, the fallback
-	// should still strip job\tstep\t prefixes from all lines.
-	fullLog := "job1\tUNKNOWN STEP\tline 1\njob1\tUNKNOWN STEP\tline 2"
-	result := extractStepLog(fullLog, "job1", "Run tests")
-	if result != "line 1\nline 2" {
-		t.Errorf("expected prefixes stripped in fallback, got: %q", result)
-	}
-}
-
-func TestExtractStepLog_JobNameMismatch(t *testing.T) {
-	// Simulates API returning display name "Test Summary" while log uses YAML key "test-summary"
-	fullLog := "test-summary\tRun tests\tline 1\ntest-summary\tRun tests\tline 2\ntest-summary\tSetup\tsetup line"
-	result := extractStepLog(fullLog, "Test Summary", "Run tests")
-	// Should match by step name even though job name differs
-	if result != "line 1\nline 2" {
-		t.Errorf("expected fuzzy match on step name, got: %q", result)
-	}
-}
-
-func TestExtractStepLog_CaseInsensitive(t *testing.T) {
-	fullLog := "ci\trun Tests\tline 1\nci\trun Tests\tline 2"
-	result := extractStepLog(fullLog, "ci", "Run Tests")
-	if result != "line 1\nline 2" {
-		t.Errorf("expected case-insensitive match, got: %q", result)
-	}
-}
-
-func TestDiscoverPrefixes(t *testing.T) {
-	lines := []string{
-		"job1\tstep1\tcontent",
-		"job1\tstep1\tmore content",
-		"job1\tstep2\tother content",
-		"job2\tstep3\tdifferent job",
-		"no tabs here",
-	}
-	prefixes := discoverPrefixes(lines)
-	if len(prefixes) != 3 {
-		t.Fatalf("expected 3 unique prefixes, got %d: %v", len(prefixes), prefixes)
 	}
 }
 
@@ -167,36 +196,5 @@ func TestShouldSkipStep(t *testing.T) {
 		if got := shouldSkipStep(tt.name); got != tt.skip {
 			t.Errorf("shouldSkipStep(%q) = %v, want %v", tt.name, got, tt.skip)
 		}
-	}
-}
-
-func TestGetFailedSteps_FallbackToFullLog(t *testing.T) {
-	stub := newStubExecutor()
-	stub.handlers["run view 400 --json jobs"] = `{
-		"jobs": [
-			{
-				"id": 4001,
-				"name": "test",
-				"status": "completed",
-				"conclusion": "failure",
-				"steps": [
-					{"name": "Run tests", "status": "completed", "conclusion": "failure", "number": 1}
-				]
-			}
-		]
-	}`
-	// Per-job log fails, full log succeeds
-	stub.handlers["run view 400 --log"] = "full log output for entire run"
-
-	orig := Executor
-	Executor = stub
-	defer func() { Executor = orig }()
-
-	steps, err := GetFailedSteps(400)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(steps) != 1 {
-		t.Fatalf("expected 1 failed step, got %d", len(steps))
 	}
 }

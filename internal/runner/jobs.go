@@ -9,7 +9,7 @@ import (
 
 // Job represents a GitHub Actions job.
 type Job struct {
-	ID         int64  `json:"id"`
+	DatabaseID int64  `json:"databaseId"`
 	Name       string `json:"name"`
 	Status     string `json:"status"`
 	Conclusion string `json:"conclusion"`
@@ -62,31 +62,32 @@ func GetFailedSteps(runID int64) ([]StepResult, error) {
 
 	var failedSteps []StepResult
 	for _, job := range result.Jobs {
-		if job.Conclusion != "failure" {
+		// Process failed and cancelled jobs — a cancelled job can still
+		// contain steps that failed before the cancellation (e.g. fail-fast matrix).
+		if job.Conclusion != "failure" && job.Conclusion != "cancelled" {
 			continue
 		}
 
-		// Fetch the log for this job
-		logOut, err := Executor.Run("run", "view", idStr, "--log", "--job", strconv.FormatInt(job.ID, 10))
+		// Fetch the raw log for this job via the REST API.
+		// This is ~2x faster than gh run view --log and produces clean
+		// output without "UNKNOWN STEP" artifacts.
+		jobLog, err := fetchJobLog(job.DatabaseID, runID)
 		if err != nil {
-			// If we can't get per-job logs, try the full run log
-			logOut, err = Executor.Run("run", "view", idStr, "--log")
-			if err != nil {
-				return nil, fmt.Errorf("fetching log for job %d: %w", job.ID, err)
-			}
+			return nil, fmt.Errorf("fetching log for job %d: %w", job.DatabaseID, err)
 		}
 
 		for _, step := range job.Steps {
-			if step.Conclusion != "failure" {
+			// Include failed steps and cancelled steps (a cancelled step may
+			// have produced test failure output before being interrupted).
+			if step.Conclusion != "failure" && step.Conclusion != "cancelled" {
 				continue
 			}
 			if shouldSkipStep(step.Name) {
 				continue
 			}
-			stepLog := extractStepLog(logOut, job.Name, step.Name)
 			failedSteps = append(failedSteps, StepResult{
 				Name: step.Name,
-				Log:  stepLog,
+				Log:  jobLog,
 			})
 		}
 	}
@@ -94,52 +95,32 @@ func GetFailedSteps(runID int64) ([]StepResult, error) {
 	return failedSteps, nil
 }
 
-// extractStepLog extracts the log section for a specific step from the full job log.
-// gh run view --log prefixes lines with the job and step name: "jobName\tstepName\tcontent".
-// The job name in log output uses the YAML key (e.g. "test-summary"), which may differ
-// from the display name returned by the jobs API (e.g. "Test Summary"). We try exact
-// match first, then fall back to matching just the step name across all log prefixes.
-func extractStepLog(fullLog, jobName, stepName string) string {
-	logLines := strings.Split(fullLog, "\n")
-
-	// Try exact prefix match first.
-	prefix := jobName + "\t" + stepName + "\t"
-	if lines := linesWithPrefix(logLines, prefix); len(lines) > 0 {
-		return strings.Join(lines, "\n")
+// fetchJobLog retrieves the raw log for a specific job, trying the REST API
+// first (faster, cleaner output) then falling back to gh run view --log.
+func fetchJobLog(jobID, runID int64) (string, error) {
+	// Try REST API: GET /repos/{owner}/{repo}/actions/jobs/{job_id}/logs
+	// Returns plain text — no tab-prefixed formatting.
+	log, err := Executor.Run("api", "repos/{owner}/{repo}/actions/jobs/"+strconv.FormatInt(jobID, 10)+"/logs")
+	if err == nil {
+		return log, nil
 	}
 
-	// The job name from the API may not match the log prefix (YAML key vs display name).
-	// Discover all unique job\tstep prefixes and match by step name.
-	for _, p := range discoverPrefixes(logLines) {
-		parts := strings.SplitN(p, "\t", 2)
-		if len(parts) == 2 && parts[1] == stepName {
-			if lines := linesWithPrefix(logLines, p+"\t"); len(lines) > 0 {
-				return strings.Join(lines, "\n")
-			}
-		}
+	// Fallback: gh run view --log --job (slower, adds job\tstep\t prefixes).
+	idStr := strconv.FormatInt(runID, 10)
+	log, err = Executor.Run("run", "view", idStr, "--log", "--job", strconv.FormatInt(jobID, 10))
+	if err != nil {
+		return "", fmt.Errorf("fetching log: %w", err)
 	}
 
-	// Case-insensitive step name match as last attempt.
-	lower := strings.ToLower(stepName)
-	for _, p := range discoverPrefixes(logLines) {
-		parts := strings.SplitN(p, "\t", 2)
-		if len(parts) == 2 && strings.ToLower(parts[1]) == lower {
-			if lines := linesWithPrefix(logLines, p+"\t"); len(lines) > 0 {
-				return strings.Join(lines, "\n")
-			}
-		}
-	}
-
-	// Absolute fallback: strip all job\tstep\t prefixes so parsers get clean content.
-	return stripAllPrefixes(logLines)
+	// Strip the tab-delimited prefixes so parsers get clean content.
+	return stripLogPrefixes(log), nil
 }
 
-// stripAllPrefixes removes the job\tstep\t prefix from every line in the log,
-// returning just the content portion. Lines without the expected tab structure
-// are kept as-is.
-func stripAllPrefixes(logLines []string) string {
-	out := make([]string, 0, len(logLines))
-	for _, line := range logLines {
+// stripLogPrefixes removes job\tstep\t prefixes from gh run view --log output.
+func stripLogPrefixes(log string) string {
+	lines := strings.Split(log, "\n")
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
 		first := strings.IndexByte(line, '\t')
 		if first < 0 {
 			out = append(out, line)
@@ -154,38 +135,4 @@ func stripAllPrefixes(logLines []string) string {
 		out = append(out, rest[second+1:])
 	}
 	return strings.Join(out, "\n")
-}
-
-// linesWithPrefix returns log content lines that match the given prefix, with the prefix stripped.
-func linesWithPrefix(logLines []string, prefix string) []string {
-	var out []string
-	for _, line := range logLines {
-		if strings.HasPrefix(line, prefix) {
-			out = append(out, strings.TrimPrefix(line, prefix))
-		}
-	}
-	return out
-}
-
-// discoverPrefixes scans log output and returns all unique "job\tstep" prefixes found.
-func discoverPrefixes(logLines []string) []string {
-	seen := make(map[string]struct{})
-	var prefixes []string
-	for _, line := range logLines {
-		// Format: jobName\tstepName\tcontent
-		first := strings.IndexByte(line, '\t')
-		if first < 0 {
-			continue
-		}
-		second := strings.IndexByte(line[first+1:], '\t')
-		if second < 0 {
-			continue
-		}
-		key := line[:first+1+second]
-		if _, ok := seen[key]; !ok {
-			seen[key] = struct{}{}
-			prefixes = append(prefixes, key)
-		}
-	}
-	return prefixes
 }

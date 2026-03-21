@@ -10,9 +10,12 @@ import (
 var Version = "dev"
 
 var rootCmd = &cobra.Command{
-	Use:   "gh-bench",
+	Use:   "bench",
 	Short: "CI benchmarking and failure extraction for GitHub Actions",
-	Long:  "gh-bench extracts numeric values from CI run logs, aggregates stats, and surfaces structured errors from failed runs.",
+	Long:  "gh bench extracts numeric values from CI run logs, aggregates stats, and surfaces structured errors from failed runs.",
+	Annotations: map[string]string{
+		cobra.CommandDisplayNameAnnotation: "gh bench",
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmd.Help()
 	},
@@ -33,9 +36,9 @@ func Execute() error {
 func versionCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
-		Short: "Print the version of gh-bench",
+		Short: "Print the version of gh bench",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("gh-bench %s\n", Version)
+			fmt.Printf("gh bench %s\n", Version)
 		},
 	}
 }
