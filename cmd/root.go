@@ -27,7 +27,7 @@ func init() {
 
 	rootCmd.PersistentFlags().String("format", "table", "Output format: table, json, csv")
 	rootCmd.PersistentFlags().Bool("json", false, "Output as JSON (shorthand for --format json)")
-	rootCmd.PersistentFlags().MarkHidden("json")
+	_ = rootCmd.PersistentFlags().MarkHidden("json")
 }
 
 // resolveFormat returns the output format from --format / --json flags.
