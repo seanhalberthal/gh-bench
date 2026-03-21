@@ -21,23 +21,34 @@ func init() {
 	statsCmd.Flags().String("workflow", "", "Workflow filename or name")
 	statsCmd.Flags().String("runs", "", "Comma-separated list of run IDs")
 	statsCmd.Flags().String("pattern", "", "Regex with a named capture group")
+	statsCmd.Flags().String("preset", "", "Use a built-in pattern preset (see --list-presets)")
+	statsCmd.Flags().Bool("list-presets", false, "List available pattern presets and exit")
 	statsCmd.Flags().Int("limit", 10, "Max number of runs to fetch")
 	statsCmd.Flags().String("branch", "", "Filter runs by branch")
 	statsCmd.Flags().String("agg", "median", "Aggregations: median, mean, p95, min, max (comma-separated)")
 	statsCmd.Flags().Int("concurrency", 5, "Number of concurrent log fetchers")
-
-	_ = statsCmd.MarkFlagRequired("pattern")
 }
 
 func runStats(cmd *cobra.Command, args []string) error {
+	listPresets, _ := cmd.Flags().GetBool("list-presets")
+	if listPresets {
+		return printPresets()
+	}
+
 	workflow, _ := cmd.Flags().GetString("workflow")
 	runsFlag, _ := cmd.Flags().GetString("runs")
-	pattern, _ := cmd.Flags().GetString("pattern")
+	patternFlag, _ := cmd.Flags().GetString("pattern")
+	presetFlag, _ := cmd.Flags().GetString("preset")
 	limit, _ := cmd.Flags().GetInt("limit")
 	branch, _ := cmd.Flags().GetString("branch")
 	aggFlag, _ := cmd.Flags().GetString("agg")
 	concurrency, _ := cmd.Flags().GetInt("concurrency")
 	jsonOutput, _ := cmd.Flags().GetBool("json")
+
+	pattern, err := resolvePatternFlag(patternFlag, presetFlag)
+	if err != nil {
+		return err
+	}
 
 	if workflow == "" && runsFlag == "" {
 		return fmt.Errorf("either --workflow or --runs is required")
@@ -142,4 +153,30 @@ func truncate(s string, max int) string {
 		return s
 	}
 	return s[:max-1] + "…"
+}
+
+func resolvePatternFlag(pattern, preset string) (string, error) {
+	if pattern != "" && preset != "" {
+		return "", fmt.Errorf("--pattern and --preset are mutually exclusive")
+	}
+	if pattern == "" && preset == "" {
+		return "", fmt.Errorf("either --pattern or --preset is required")
+	}
+	if preset != "" {
+		return runner.ResolvePattern(preset)
+	}
+	return pattern, nil
+}
+
+func printPresets() error {
+	fmt.Println("Available pattern presets:")
+	fmt.Println()
+	for _, name := range runner.PresetNames() {
+		p := runner.Presets[name]
+		fmt.Printf("  %-14s %s\n", name, p.Description)
+		fmt.Printf("  %-14s pattern: %s\n", "", p.Pattern)
+		fmt.Printf("  %-14s e.g.    %s\n", "", p.Example)
+		fmt.Println()
+	}
+	return nil
 }

@@ -3,9 +3,70 @@ package runner
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
+
+// Preset defines a reusable extraction pattern with metadata.
+type Preset struct {
+	Pattern     string
+	Description string
+	Example     string
+}
+
+// Presets maps preset names to their definitions.
+var Presets = map[string]Preset{
+	"duration": {
+		Pattern:     `(?i)(?:took|duration|time|elapsed|finished in|completed in)\s*[:=]?\s*(?P<duration>[0-9.]+)\s*(?:ms|s)\b`,
+		Description: "Common duration/timing output",
+		Example:     "Took 12.5s, duration: 45ms, elapsed: 3.2s",
+	},
+	"coverage": {
+		Pattern:     `(?i)coverage\s*[:=]?\s*(?P<coverage>[0-9.]+)\s*%`,
+		Description: "Test coverage percentages",
+		Example:     "Coverage: 85.2%, coverage=91%",
+	},
+	"go-test": {
+		Pattern:     `^ok\s+\S+\s+(?P<duration>[0-9.]+)s`,
+		Description: "Go test package duration",
+		Example:     "ok  github.com/foo/bar  1.234s",
+	},
+	"jest": {
+		Pattern:     `(?i)time\s*:\s*(?P<duration>[0-9.]+)\s*(?:ms|s)`,
+		Description: "Jest/Vitest test suite time",
+		Example:     "Time:        4.589 s",
+	},
+	"pytest": {
+		Pattern:     `(?i)passed in\s+(?P<duration>[0-9.]+)s`,
+		Description: "Pytest suite duration",
+		Example:     "42 passed in 3.45s",
+	},
+	"bundle-size": {
+		Pattern:     `(?i)(?:bundle[- ]?size|size)\s*[:=]?\s*(?P<size>[0-9.]+)\s*(?:kb|mb|gb|bytes|b)\b`,
+		Description: "Bundle or file size output",
+		Example:     "Bundle size: 245.3 kB, size: 1.2 MB",
+	},
+}
+
+// PresetNames returns sorted preset names.
+func PresetNames() []string {
+	names := make([]string, 0, len(Presets))
+	for name := range Presets {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// ResolvePattern returns the regex for a preset name, or an error if not found.
+func ResolvePattern(name string) (string, error) {
+	p, ok := Presets[name]
+	if !ok {
+		return "", fmt.Errorf("unknown preset %q (available: %s)", name, strings.Join(PresetNames(), ", "))
+	}
+	return p.Pattern, nil
+}
 
 // ExtractedValue holds a single extracted value from a run's log.
 type ExtractedValue struct {
@@ -73,7 +134,7 @@ func ExtractValues(results []RunResult, pattern string) (ExtractedValues, error)
 
 // findFirstMatch finds the first match of the regex in the log and returns the named group value.
 func findFirstMatch(re *regexp.Regexp, log string, groupIdx int) string {
-	for _, line := range strings.Split(log, "\n") {
+	for line := range strings.SplitSeq(log, "\n") {
 		match := re.FindStringSubmatch(line)
 		if match != nil && groupIdx < len(match) {
 			return match[groupIdx]

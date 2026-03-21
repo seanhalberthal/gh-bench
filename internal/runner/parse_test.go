@@ -140,3 +140,129 @@ func TestExtractValues_MixedMatchAndNoMatch(t *testing.T) {
 		t.Fatalf("expected 2 values, got %d", len(values))
 	}
 }
+
+func TestResolvePattern_ValidPreset(t *testing.T) {
+	pattern, err := ResolvePattern("duration")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if pattern != Presets["duration"].Pattern {
+		t.Errorf("got %q, want %q", pattern, Presets["duration"].Pattern)
+	}
+}
+
+func TestResolvePattern_UnknownPreset(t *testing.T) {
+	_, err := ResolvePattern("nonexistent")
+	if err == nil {
+		t.Fatal("expected error for unknown preset")
+	}
+}
+
+func TestPresetNames_Sorted(t *testing.T) {
+	names := PresetNames()
+	for i := 1; i < len(names); i++ {
+		if names[i] < names[i-1] {
+			t.Fatalf("names not sorted: %v", names)
+		}
+	}
+}
+
+func TestAllPresets_ValidRegex(t *testing.T) {
+	for name, preset := range Presets {
+		t.Run(name, func(t *testing.T) {
+			results := []RunResult{
+				{RunID: 1, Title: "test", Log: preset.Example},
+			}
+			values, err := ExtractValues(results, preset.Pattern)
+			if err != nil {
+				t.Fatalf("preset %q failed on its own example: %v", name, err)
+			}
+			if len(values) == 0 {
+				t.Errorf("preset %q matched nothing on its own example %q", name, preset.Example)
+			}
+		})
+	}
+}
+
+func TestPreset_Duration(t *testing.T) {
+	cases := []struct {
+		log  string
+		want float64
+	}{
+		{"Took 12.5s end", 12.5},
+		{"duration: 45ms done", 45},
+		{"elapsed= 3.2s", 3.2},
+		{"Finished in 100ms", 100},
+		{"completed in 7.8s", 7.8},
+		{"Time: 4.589 s", 4.589},
+	}
+	pattern := Presets["duration"].Pattern
+	for _, tc := range cases {
+		results := []RunResult{{RunID: 1, Title: "t", Log: tc.log}}
+		values, err := ExtractValues(results, pattern)
+		if err != nil {
+			t.Errorf("log %q: unexpected error: %v", tc.log, err)
+			continue
+		}
+		if len(values) != 1 {
+			t.Errorf("log %q: expected 1 value, got %d", tc.log, len(values))
+			continue
+		}
+		if values[0].Value != tc.want {
+			t.Errorf("log %q: got %v, want %v", tc.log, values[0].Value, tc.want)
+		}
+	}
+}
+
+func TestPreset_Coverage(t *testing.T) {
+	cases := []struct {
+		log  string
+		want float64
+	}{
+		{"Coverage: 85.2%", 85.2},
+		{"coverage=91%", 91},
+		{"total coverage: 100.0 %", 100.0},
+	}
+	pattern := Presets["coverage"].Pattern
+	for _, tc := range cases {
+		results := []RunResult{{RunID: 1, Title: "t", Log: tc.log}}
+		values, err := ExtractValues(results, pattern)
+		if err != nil {
+			t.Errorf("log %q: unexpected error: %v", tc.log, err)
+			continue
+		}
+		if len(values) != 1 {
+			t.Errorf("log %q: expected 1 value, got %d", tc.log, len(values))
+			continue
+		}
+		if values[0].Value != tc.want {
+			t.Errorf("log %q: got %v, want %v", tc.log, values[0].Value, tc.want)
+		}
+	}
+}
+
+func TestPreset_GoTest(t *testing.T) {
+	results := []RunResult{
+		{RunID: 1, Title: "t", Log: "ok  \tgithub.com/foo/bar\t1.234s"},
+	}
+	values, err := ExtractValues(results, Presets["go-test"].Pattern)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(values) != 1 || values[0].Value != 1.234 {
+		t.Errorf("got %v, want 1.234", values)
+	}
+}
+
+func TestPreset_Pytest(t *testing.T) {
+	results := []RunResult{
+		{RunID: 1, Title: "t", Log: "====== 42 passed in 3.45s ======"},
+	}
+	values, err := ExtractValues(results, Presets["pytest"].Pattern)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(values) != 1 || values[0].Value != 3.45 {
+		t.Errorf("got %v, want 3.45", values)
+	}
+}

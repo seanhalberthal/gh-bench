@@ -84,7 +84,6 @@ func FetchLogs(ctx context.Context, opts FetchOpts) ([]RunResult, error) {
 	g.SetLimit(opts.Concurrency)
 
 	for i, id := range runIDs {
-		i, id := i, id
 		g.Go(func() error {
 			result, err := fetchSingleRun(ctx, id, opts.FailedOnly)
 			if err != nil {
@@ -122,7 +121,7 @@ func listRunIDs(opts FetchOpts) ([]int64, error) {
 	}
 
 	var ids []int64
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(out), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
@@ -136,7 +135,7 @@ func listRunIDs(opts FetchOpts) ([]int64, error) {
 	return ids, nil
 }
 
-func fetchSingleRun(ctx context.Context, runID int64, failedOnly bool) (RunResult, error) {
+func fetchSingleRun(_ context.Context, runID int64, failedOnly bool) (RunResult, error) {
 	idStr := strconv.FormatInt(runID, 10)
 
 	// Get run metadata
