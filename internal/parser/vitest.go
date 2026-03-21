@@ -1,0 +1,80 @@
+package parser
+
+import (
+	"regexp"
+	"strings"
+)
+
+// VitestParser extracts failures from Vitest/Jest output.
+type VitestParser struct{}
+
+var (
+	// Matches: "FAIL src/components/Foo.test.tsx" or "FAIL src/components/Foo.test.ts"
+	vitestFileFailRe = regexp.MustCompile(`FAIL\s+(\S+\.(?:test|spec)\.\w+)`)
+	// Matches: "✗ Suite > Test Name" or "● Suite › Test Name" or "× Suite > Test Name"
+	vitestTestFailRe = regexp.MustCompile(`[✗●×]\s+(.+)`)
+	// Matches: "AssertionError:" or "Error:" lines
+	vitestErrorRe = regexp.MustCompile(`^\s+((?:AssertionError|AssertError|Error|TypeError|ReferenceError):.+)$`)
+	// Matches: "at src/components/Foo.test.tsx:38:18"
+	vitestLocationRe = regexp.MustCompile(`at\s+(\S+\.\w+:\d+:\d+)`)
+	// Matches: "expected 'X' to equal 'Y'"
+	vitestExpectedRe = regexp.MustCompile(`^\s+(expected\s+.+)$`)
+)
+
+// Name returns the parser name.
+func (v *VitestParser) Name() string { return "Vitest" }
+
+// Detect checks if the log contains Vitest/Jest failure patterns.
+func (v *VitestParser) Detect(logs string) bool {
+	return vitestFileFailRe.MatchString(logs) || vitestTestFailRe.MatchString(logs)
+}
+
+// Extract parses Vitest/Jest failures from logs.
+func (v *VitestParser) Extract(logs string) []Failure {
+	lines := strings.Split(logs, "\n")
+	var failures []Failure
+
+	for i := 0; i < len(lines); i++ {
+		match := vitestTestFailRe.FindStringSubmatch(lines[i])
+		if match == nil {
+			continue
+		}
+
+		// Skip if this looks like a passing test indicator
+		testName := strings.TrimSpace(match[1])
+		if testName == "" {
+			continue
+		}
+
+		f := Failure{
+			TestName:  testName,
+			Framework: "Vitest",
+		}
+
+		// Collect error details from subsequent lines
+		var msgLines []string
+		for j := i + 1; j < len(lines) && j < i+20; j++ {
+			line := lines[j]
+
+			// Stop at next test marker
+			if vitestTestFailRe.MatchString(line) {
+				break
+			}
+
+			if errMatch := vitestErrorRe.FindStringSubmatch(line); errMatch != nil {
+				msgLines = append(msgLines, strings.TrimSpace(errMatch[1]))
+			} else if expMatch := vitestExpectedRe.FindStringSubmatch(line); expMatch != nil {
+				msgLines = append(msgLines, strings.TrimSpace(expMatch[1]))
+			}
+
+			if locMatch := vitestLocationRe.FindStringSubmatch(line); locMatch != nil && f.Location == "" {
+				f.Location = locMatch[1]
+			}
+		}
+
+		f.Message = strings.Join(msgLines, "\n")
+		failures = append(failures, f)
+	}
+
+	return failures
+}
