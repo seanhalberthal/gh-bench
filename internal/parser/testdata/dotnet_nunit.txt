@@ -1,0 +1,17 @@
+NUnit Console Runner 3.16.3
+
+Runtime Environment
+   OS Platform: Linux
+
+Test Files
+    /app/tests/Dana.Tests.dll
+
+  Failed Dana.Tests.Data.MigrationTests.Can_Apply_All_Migrations [230ms]
+      System.Data.SqlClient.SqlException: Invalid column name 'CaseRef'
+      at System.Data.SqlClient.SqlConnection.OnError() in SqlConnection.cs:line 487
+
+Errors, Failures and Warnings
+
+Test Run Summary
+  Overall result: Failed
+  Test Count: 38, Passed: 37, Failed: 1, Warnings: 0, Inconclusive: 0, Skipped: 0

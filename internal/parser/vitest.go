@@ -12,7 +12,8 @@ var (
 	// Matches: "FAIL src/components/Foo.test.tsx" or "FAIL src/components/Foo.test.ts"
 	vitestFileFailRe = regexp.MustCompile(`FAIL\s+(\S+\.(?:test|spec)\.\w+)`)
 	// Matches: "✗ Suite > Test Name" or "● Suite › Test Name" or "× Suite > Test Name"
-	vitestTestFailRe = regexp.MustCompile(`[✗●×]\s+(.+)`)
+	// Requires ">" or "›" to distinguish test-level failures from file-level lines
+	vitestTestFailRe = regexp.MustCompile(`[✗●×]\s+(.+[>›].+)`)
 	// Matches: "AssertionError:" or "Error:" lines
 	vitestErrorRe = regexp.MustCompile(`^\s+((?:AssertionError|AssertError|Error|TypeError|ReferenceError):.+)$`)
 	// Matches: "at src/components/Foo.test.tsx:38:18"

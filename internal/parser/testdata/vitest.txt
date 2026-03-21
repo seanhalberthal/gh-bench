@@ -1,0 +1,12 @@
+ ✓ src/components/Header.test.tsx (3 tests) 45ms
+ ✗ src/components/HearingCard.test.tsx (2 tests) 89ms
+   ✗ HearingCard > renders participant names
+      AssertionError: expected 'Smith v Jones' to equal 'Jones v Smith'
+      at src/components/HearingCard.test.tsx:38:18
+   ✗ HearingCard > displays correct date format
+      AssertionError: expected '21/03/2025' to equal '2025-03-21'
+      at src/components/HearingCard.test.tsx:52:12
+ ✓ src/components/Footer.test.tsx (1 test) 12ms
+
+ Tests  3 passed | 2 failed
+ Duration  146ms

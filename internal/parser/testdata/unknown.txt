@@ -1,0 +1,24 @@
+Step 1/5 : FROM node:18-alpine
+ ---> abc123def456
+Step 2/5 : WORKDIR /app
+ ---> Using cache
+Step 3/5 : COPY package*.json ./
+ ---> Using cache
+Step 4/5 : RUN npm ci
+ ---> Running in container
+npm ERR! code ERESOLVE
+npm ERR! ERESOLVE unable to resolve dependency tree
+npm ERR!
+npm ERR! While resolving: app@1.0.0
+npm ERR! Found: react@18.2.0
+npm ERR! node_modules/react
+npm ERR!   react@"^18.2.0" from the root project
+npm ERR!
+npm ERR! Could not resolve dependency:
+npm ERR! peer react@"^17.0.0" from some-old-lib@2.1.0
+npm ERR!
+npm ERR! Fix the upstream dependency conflict, or retry
+npm ERR! this command with --force or --legacy-peer-deps
+npm ERR!
+The command '/bin/sh -c npm ci' returned a non-zero code: 1
+Process completed with exit code 1.

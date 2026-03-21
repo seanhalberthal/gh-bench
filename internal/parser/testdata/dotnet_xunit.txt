@@ -1,0 +1,15 @@
+Starting test execution, please wait...
+A total of 1 test files matched the specified pattern.
+
+  Passed Dana.Tests.Auth.LoginTests.Successful_Login [22ms]
+  Passed Dana.Tests.Auth.LoginTests.Invalid_Password_Returns_401 [8ms]
+  Failed Dana.Tests.Search.GlobalSearchTests.Returns_Results_For_Partial_Match [45ms]
+      System.NullReferenceException: Object reference not set to an instance of an object
+      at Dana.Api.Search.SearchService.Query() in SearchService.cs:line 84
+      at Dana.Api.Search.SearchController.Search() in SearchController.cs:line 32
+  Failed Dana.Tests.Search.GlobalSearchTests.Excludes_Hidden_Participants [12ms]
+      Assert.Equal() Failure
+      Expected: 3
+      Actual:   4
+
+Failed!  - Failed:     2, Passed:     2, Skipped:     0, Total:     4, Duration: 1.234 s

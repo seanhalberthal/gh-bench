@@ -1,0 +1,15 @@
+=== RUN   TestSearchService_Query
+=== RUN   TestSearchService_Query/returns_results
+=== RUN   TestSearchService_Query/handles_empty_query
+--- PASS: TestSearchService_Query/returns_results (0.02s)
+    search_test.go:42: query returned 5 results
+--- FAIL: TestSearchService_Query/handles_empty_query (0.01s)
+    search_test.go:58: expected 0 results, got 3
+    search_test.go:59: empty query should return no results
+--- FAIL: TestSearchService_Query (0.03s)
+=== RUN   TestCacheInvalidation
+--- FAIL: TestCacheInvalidation (0.15s)
+    cache_test.go:102: cache entry still present after TTL
+    cache_test.go:103: expected nil, got &{Key:search Value:stale}
+FAIL
+FAIL	github.com/example/search	0.234s
