@@ -74,9 +74,9 @@ func runStats(cmd *cobra.Command, args []string) error {
 		opts.RunIDs = ids
 	}
 
-	stop := startSpinner("Fetching run logs…")
-	results, err := runner.FetchLogs(cmd.Context(), opts)
-	stop()
+	results, err := withSpinner("Fetching run logs…", func() ([]runner.RunResult, error) {
+		return runner.FetchLogs(cmd.Context(), opts)
+	})
 	if err != nil {
 		return fmt.Errorf("fetching logs: %w", err)
 	}
