@@ -14,13 +14,13 @@
 
 [![CI](https://img.shields.io/github/actions/workflow/status/seanhalberthal/gh-bench/release.yml?style=flat&logo=githubactions&logoColor=white&label=CI)](https://github.com/seanhalberthal/gh-bench/actions)
 [![Release](https://img.shields.io/github/v/release/seanhalberthal/gh-bench?style=flat&logo=github&logoColor=white)](https://github.com/seanhalberthal/gh-bench/releases/latest)
-[![Go](https://img.shields.io/badge/Go-1.26-00ADD8?style=flat&logo=go&logoColor=white)](https://go.dev)
+[![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?style=flat&logo=go&logoColor=white)](https://go.dev)
 [![gh extension](https://img.shields.io/badge/gh-extension-2088FF?style=flat&logo=githubactions&logoColor=white)](https://cli.github.com/manual/gh_extension)
 [![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black)](https://github.com/seanhalberthal/gh-bench/releases)
 [![macOS](https://img.shields.io/badge/macOS-000000?style=flat&logo=apple&logoColor=white)](https://github.com/seanhalberthal/gh-bench/releases)
 [![Windows](https://img.shields.io/badge/Windows-0078D4?style=flat&logo=windows&logoColor=white)](https://github.com/seanhalberthal/gh-bench/releases)
 
-[Quick Start](#quick-start) · [Commands](#commands) · [Framework Support](#framework-support) · [Examples](#examples)
+[Quick Start](#quick-start) · [Commands](#commands) · [Framework Support](#framework-support) · [Configuration](#configuration) · [Examples](#examples)
 
 </div>
 
@@ -114,6 +114,29 @@ The fallback parser strips GitHub Actions boilerplate (env vars, annotations, cl
 
 ---
 
+## Configuration
+
+Create a `.gh-bench.yml` file in your repository root to set project-level defaults. CLI flags override config values when explicitly set.
+
+```yaml
+# .gh-bench.yml
+workflow: ci.yml
+
+failures:
+  exclude-steps:
+    - "Check CI status"
+    - "Summary"
+```
+
+| Key | Applies to | Description |
+|-----|------------|-------------|
+| `workflow` | `stats`, `failures` | Default workflow (replaces `--workflow` flag) |
+| `failures.exclude-steps` | `failures` | Steps to exclude by name (replaces `--exclude-step` flag) |
+
+The config file is discovered by walking up from the current directory to the nearest `.git` root.
+
+---
+
 ## Examples
 
 ### Tracking build duration across runs
@@ -172,29 +195,6 @@ $ gh bench failures --runs 23341983210
 $ gh bench failures --runs 23341983210 --json | jq '.[].failures[].test_name'
 "Acme.IntegrationTests.TokenManagement.ExchangeCodeForTokens_ReturnsBadRequest"
 ```
-
----
-
-## Configuration
-
-Create a `.gh-bench.yml` file in your repository root to set project-level defaults. CLI flags override config values when explicitly set.
-
-```yaml
-# .gh-bench.yml
-workflow: ci.yml
-
-failures:
-  exclude-steps:
-    - "Check CI status"
-    - "Summary"
-```
-
-| Key | Applies to | Description |
-|-----|------------|-------------|
-| `workflow` | `stats`, `failures` | Default workflow (replaces `--workflow` flag) |
-| `failures.exclude-steps` | `failures` | Steps to exclude by name (replaces `--exclude-step` flag) |
-
-The config file is discovered by walking up from the current directory to the nearest `.git` root.
 
 ---
 
