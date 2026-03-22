@@ -77,10 +77,7 @@ func P95(values []float64) float64 {
 
 	n := float64(len(sorted))
 	rank := math.Ceil(0.95 * n)
-	idx := int(rank) - 1
-	if idx < 0 {
-		idx = 0
-	}
+	idx := max(int(rank)-1, 0)
 	if idx >= len(sorted) {
 		idx = len(sorted) - 1
 	}

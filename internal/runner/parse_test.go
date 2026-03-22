@@ -11,7 +11,7 @@ func TestExtractValues_ValidPattern(t *testing.T) {
 		{RunID: 3, Title: "run three", Log: "build complete\nmedian=103.2ms\ndone"},
 	}
 
-	values, err := ExtractValues(results, `median=(?P<ms>[0-9.]+)ms`)
+	values, err := ExtractValues(results, `median=(?P<ms>[0-9.]+)ms`, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -28,14 +28,14 @@ func TestExtractValues_ValidPattern(t *testing.T) {
 }
 
 func TestExtractValues_NoNamedGroup(t *testing.T) {
-	_, err := ExtractValues(nil, `median=([0-9.]+)ms`)
+	_, err := ExtractValues(nil, `median=([0-9.]+)ms`, false)
 	if err == nil {
 		t.Fatal("expected error for pattern without named capture group")
 	}
 }
 
 func TestExtractValues_InvalidRegex(t *testing.T) {
-	_, err := ExtractValues(nil, `[invalid`)
+	_, err := ExtractValues(nil, `[invalid`, false)
 	if err == nil {
 		t.Fatal("expected error for invalid regex")
 	}
@@ -46,7 +46,7 @@ func TestExtractValues_NoMatch(t *testing.T) {
 		{RunID: 1, Title: "run one", Log: "no match here"},
 	}
 
-	values, err := ExtractValues(results, `median=(?P<ms>[0-9.]+)ms`)
+	values, err := ExtractValues(results, `median=(?P<ms>[0-9.]+)ms`, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestExtractValues_NonNumericMatch(t *testing.T) {
 	}
 
 	// Pattern that matches non-numeric text
-	_, err := ExtractValues(results, `status=(?P<val>[a-z]+)`)
+	_, err := ExtractValues(results, `status=(?P<val>[a-z]+)`, false)
 	if err == nil {
 		t.Fatal("expected error for non-numeric match")
 	}
@@ -72,7 +72,7 @@ func TestExtractValues_MultiLineLog(t *testing.T) {
 		{RunID: 1, Title: "run", Log: "line1\nline2\nmetric=42.0\nline4\nmetric=99.0\nline6"},
 	}
 
-	values, err := ExtractValues(results, `metric=(?P<val>[0-9.]+)`)
+	values, err := ExtractValues(results, `metric=(?P<val>[0-9.]+)`, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -91,7 +91,7 @@ func TestExtractValues_MultipleNamedGroups(t *testing.T) {
 	}
 
 	// Pattern with multiple named groups — first named group is used
-	values, err := ExtractValues(results, `time=(?P<time>[0-9]+)ms memory=(?P<mem>[0-9]+)mb`)
+	values, err := ExtractValues(results, `time=(?P<time>[0-9]+)ms memory=(?P<mem>[0-9]+)mb`, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestExtractedValues_Numbers(t *testing.T) {
 }
 
 func TestExtractValues_EmptyResults(t *testing.T) {
-	values, err := ExtractValues(nil, `metric=(?P<val>[0-9.]+)`)
+	values, err := ExtractValues(nil, `metric=(?P<val>[0-9.]+)`, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -132,11 +132,187 @@ func TestExtractValues_MixedMatchAndNoMatch(t *testing.T) {
 		{RunID: 3, Title: "has match", Log: "metric=99.0"},
 	}
 
-	values, err := ExtractValues(results, `metric=(?P<val>[0-9.]+)`)
+	values, err := ExtractValues(results, `metric=(?P<val>[0-9.]+)`, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(values) != 2 {
 		t.Fatalf("expected 2 values, got %d", len(values))
+	}
+}
+
+func TestResolvePattern_ValidPreset(t *testing.T) {
+	pattern, err := ResolvePattern("duration")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if pattern != Presets["duration"].Pattern {
+		t.Errorf("got %q, want %q", pattern, Presets["duration"].Pattern)
+	}
+}
+
+func TestResolvePattern_UnknownPreset(t *testing.T) {
+	_, err := ResolvePattern("nonexistent")
+	if err == nil {
+		t.Fatal("expected error for unknown preset")
+	}
+}
+
+func TestPresetNames_Sorted(t *testing.T) {
+	names := PresetNames()
+	for i := 1; i < len(names); i++ {
+		if names[i] < names[i-1] {
+			t.Fatalf("names not sorted: %v", names)
+		}
+	}
+}
+
+func TestAllPresets_ValidRegex(t *testing.T) {
+	for name, preset := range Presets {
+		t.Run(name, func(t *testing.T) {
+			results := []RunResult{
+				{RunID: 1, Title: "test", Log: preset.Example},
+			}
+			values, err := ExtractValues(results, preset.Pattern, false)
+			if err != nil {
+				t.Fatalf("preset %q failed on its own example: %v", name, err)
+			}
+			if len(values) == 0 {
+				t.Errorf("preset %q matched nothing on its own example %q", name, preset.Example)
+			}
+		})
+	}
+}
+
+func TestPreset_Duration(t *testing.T) {
+	cases := []struct {
+		log  string
+		want float64
+	}{
+		{"Took 12.5s end", 12.5},
+		{"duration: 45ms done", 45},
+		{"elapsed= 3.2s", 3.2},
+		{"Finished in 100ms", 100},
+		{"completed in 7.8s", 7.8},
+		{"Time: 4.589 s", 4.589},
+	}
+	pattern := Presets["duration"].Pattern
+	for _, tc := range cases {
+		results := []RunResult{{RunID: 1, Title: "t", Log: tc.log}}
+		values, err := ExtractValues(results, pattern, false)
+		if err != nil {
+			t.Errorf("log %q: unexpected error: %v", tc.log, err)
+			continue
+		}
+		if len(values) != 1 {
+			t.Errorf("log %q: expected 1 value, got %d", tc.log, len(values))
+			continue
+		}
+		if values[0].Value != tc.want {
+			t.Errorf("log %q: got %v, want %v", tc.log, values[0].Value, tc.want)
+		}
+	}
+}
+
+func TestPreset_Coverage(t *testing.T) {
+	cases := []struct {
+		log  string
+		want float64
+	}{
+		{"Coverage: 85.2%", 85.2},
+		{"coverage=91%", 91},
+		{"total coverage: 100.0 %", 100.0},
+	}
+	pattern := Presets["coverage"].Pattern
+	for _, tc := range cases {
+		results := []RunResult{{RunID: 1, Title: "t", Log: tc.log}}
+		values, err := ExtractValues(results, pattern, false)
+		if err != nil {
+			t.Errorf("log %q: unexpected error: %v", tc.log, err)
+			continue
+		}
+		if len(values) != 1 {
+			t.Errorf("log %q: expected 1 value, got %d", tc.log, len(values))
+			continue
+		}
+		if values[0].Value != tc.want {
+			t.Errorf("log %q: got %v, want %v", tc.log, values[0].Value, tc.want)
+		}
+	}
+}
+
+func TestPreset_GoTest(t *testing.T) {
+	results := []RunResult{
+		{RunID: 1, Title: "t", Log: "ok  \tgithub.com/foo/bar\t1.234s"},
+	}
+	values, err := ExtractValues(results, Presets["go-test"].Pattern, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(values) != 1 || values[0].Value != 1.234 {
+		t.Errorf("got %v, want 1.234", values)
+	}
+}
+
+func TestPreset_Pytest(t *testing.T) {
+	results := []RunResult{
+		{RunID: 1, Title: "t", Log: "====== 42 passed in 3.45s ======"},
+	}
+	values, err := ExtractValues(results, Presets["pytest"].Pattern, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(values) != 1 || values[0].Value != 3.45 {
+		t.Errorf("got %v, want 3.45", values)
+	}
+}
+
+func TestExtractValues_MatchAll(t *testing.T) {
+	results := []RunResult{
+		{RunID: 1, Title: "run", Log: "line1\nmetric=42.0\nline3\nmetric=99.0\nline5"},
+	}
+
+	values, err := ExtractValues(results, `metric=(?P<val>[0-9.]+)`, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(values) != 2 {
+		t.Fatalf("expected 2 values, got %d", len(values))
+	}
+	if values[0].Value != 42.0 {
+		t.Errorf("values[0] = %v, want 42.0", values[0].Value)
+	}
+	if values[1].Value != 99.0 {
+		t.Errorf("values[1] = %v, want 99.0", values[1].Value)
+	}
+}
+
+func TestExtractValues_MatchAll_NoMatches(t *testing.T) {
+	results := []RunResult{
+		{RunID: 1, Title: "run", Log: "no matches here"},
+	}
+
+	values, err := ExtractValues(results, `metric=(?P<val>[0-9.]+)`, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(values) != 0 {
+		t.Fatalf("expected 0 values, got %d", len(values))
+	}
+}
+
+func TestExtractValues_MatchAll_MixedRuns(t *testing.T) {
+	results := []RunResult{
+		{RunID: 1, Title: "multi", Log: "metric=10.0\nmetric=20.0"},
+		{RunID: 2, Title: "none", Log: "nothing"},
+		{RunID: 3, Title: "single", Log: "metric=30.0"},
+	}
+
+	values, err := ExtractValues(results, `metric=(?P<val>[0-9.]+)`, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(values) != 3 {
+		t.Fatalf("expected 3 values, got %d", len(values))
 	}
 }

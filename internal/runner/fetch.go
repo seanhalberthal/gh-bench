@@ -3,6 +3,7 @@ package runner
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strconv"
@@ -14,11 +15,18 @@ import (
 // FetchOpts configures log fetching behaviour.
 type FetchOpts struct {
 	Workflow    string
-	RunIDs     []int64
-	Branch     string
-	Limit      int
+	RunIDs      []int64
+	Branch      string
+	Limit       int
 	Concurrency int
+	FailedOnly  bool
+	Step        string // Filter logs to a specific step name
+}
+
+// fetchRunOpts are per-run options passed to fetchSingleRun.
+type fetchRunOpts struct {
 	FailedOnly bool
+	Step       string
 }
 
 // RunResult holds the output for a single workflow run.
@@ -83,10 +91,10 @@ func FetchLogs(ctx context.Context, opts FetchOpts) ([]RunResult, error) {
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(opts.Concurrency)
 
+	runOpts := fetchRunOpts{FailedOnly: opts.FailedOnly, Step: opts.Step}
 	for i, id := range runIDs {
-		i, id := i, id
 		g.Go(func() error {
-			result, err := fetchSingleRun(ctx, id, opts.FailedOnly)
+			result, err := fetchSingleRun(ctx, id, runOpts)
 			if err != nil {
 				return fmt.Errorf("run %d: %w", id, err)
 			}
@@ -122,7 +130,7 @@ func listRunIDs(opts FetchOpts) ([]int64, error) {
 	}
 
 	var ids []int64
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(out), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
@@ -136,7 +144,7 @@ func listRunIDs(opts FetchOpts) ([]int64, error) {
 	return ids, nil
 }
 
-func fetchSingleRun(ctx context.Context, runID int64, failedOnly bool) (RunResult, error) {
+func fetchSingleRun(_ context.Context, runID int64, opts fetchRunOpts) (RunResult, error) {
 	idStr := strconv.FormatInt(runID, 10)
 
 	// Get run metadata
@@ -158,13 +166,19 @@ func fetchSingleRun(ctx context.Context, runID int64, failedOnly bool) (RunResul
 		Date:  date,
 	}
 
-	if failedOnly {
+	if opts.FailedOnly {
 		// Get failed steps via jobs API
 		steps, err := GetFailedSteps(runID)
 		if err != nil {
 			return result, fmt.Errorf("fetching failed steps: %w", err)
 		}
 		result.FailedSteps = steps
+	} else if opts.Step != "" {
+		log, err := getStepLog(runID, opts.Step)
+		if err != nil {
+			return result, fmt.Errorf("fetching step log: %w", err)
+		}
+		result.Log = log
 	} else {
 		// Get full log
 		logOut, err := Executor.Run("run", "view", idStr, "--log")
@@ -175,4 +189,38 @@ func fetchSingleRun(ctx context.Context, runID int64, failedOnly bool) (RunResul
 	}
 
 	return result, nil
+}
+
+// getStepLog fetches the log for a specific step name within a run.
+// It finds the first step matching the name (case-insensitive contains)
+// across all jobs in the run.
+func getStepLog(runID int64, stepName string) (string, error) {
+	idStr := strconv.FormatInt(runID, 10)
+
+	out, err := Executor.Run("run", "view", idStr, "--json", "jobs")
+	if err != nil {
+		return "", fmt.Errorf("fetching jobs: %w", err)
+	}
+
+	var result struct {
+		Jobs []Job `json:"jobs"`
+	}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		return "", fmt.Errorf("parsing jobs JSON: %w", err)
+	}
+
+	lowerStep := strings.ToLower(stepName)
+	for _, job := range result.Jobs {
+		for _, step := range job.Steps {
+			if strings.Contains(strings.ToLower(step.Name), lowerStep) {
+				log, err := fetchJobLog(job.DatabaseID, runID)
+				if err != nil {
+					return "", err
+				}
+				return log, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("step matching %q not found in run %d", stepName, runID)
 }

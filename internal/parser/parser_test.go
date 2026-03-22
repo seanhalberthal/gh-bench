@@ -35,6 +35,24 @@ func TestParse_VitestDetected(t *testing.T) {
 	}
 }
 
+func TestParse_PytestDetected(t *testing.T) {
+	logs := readTestData(t, "pytest.txt")
+	failures := Parse(logs)
+	if len(failures) == 0 {
+		t.Fatal("expected failures to be extracted from pytest logs")
+	}
+	if failures[0].Framework != "pytest" {
+		t.Errorf("expected framework 'pytest', got %q", failures[0].Framework)
+	}
+}
+
+func TestDetectFramework_Pytest(t *testing.T) {
+	logs := readTestData(t, "pytest.txt")
+	if fw := DetectFramework(logs); fw != "pytest" {
+		t.Errorf("expected 'pytest', got %q", fw)
+	}
+}
+
 func TestParse_FallbackForUnknown(t *testing.T) {
 	logs := readTestData(t, "unknown.txt")
 	failures := Parse(logs)

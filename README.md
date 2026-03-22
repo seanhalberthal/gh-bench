@@ -55,16 +55,22 @@ gh bench stats --workflow ci.yml --pattern 'duration=(?P<s>[0-9.]+)s' --agg medi
 gh bench stats --runs 111,222,333 --pattern 'score=(?P<val>[0-9.]+)'
 ```
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--workflow` | | Workflow filename or name |
-| `--runs` | | Comma-separated list of run IDs |
-| `--pattern` | **(required)** | Regex with a named capture group `(?P<name>...)` |
-| `--limit` | `10` | Max number of runs to fetch |
-| `--branch` | | Filter runs by branch |
-| `--agg` | `median` | Aggregations: `median`, `mean`, `p95`, `min`, `max` (comma-separated) |
-| `--concurrency` | `5` | Concurrent log fetchers |
-| `--json` | `false` | Output as JSON |
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--workflow` | `-w` | | Workflow filename or name |
+| `--runs` | `-r` | | Comma-separated list of run IDs |
+| `--pattern` | `-P` | | Regex with a named capture group `(?P<name>...)` |
+| `--preset` | `-p` | | Use a built-in pattern preset (see `--list-presets`) |
+| `--list-presets` | `-L` | | List available pattern presets and exit |
+| `--limit` | `-l` | `10` | Max number of runs to fetch |
+| `--branch` | `-b` | | Filter runs by branch |
+| `--agg` | `-a` | `median` | Aggregations: `median`, `mean`, `p95`, `min`, `max` (comma-separated) |
+| `--match` | `-m` | `first` | Which matches to extract per run: `first`, `all` |
+| `--step` | `-s` | | Filter logs to a specific step name (substring match) |
+| `--concurrency` | `-c` | `5` | Concurrent log fetchers |
+| `--format` | `-f` | `table` | Output format: `table`, `json`, `csv` |
+
+Either `--pattern` or `--preset` is required. Either `--workflow` or `--runs` is required.
 
 ### `gh bench failures`
 
@@ -72,19 +78,21 @@ Fetch failed CI runs, identify failing steps, and extract structured errors usin
 
 ```bash
 gh bench failures --workflow ci.yml
-gh bench failures --runs 12345678
-gh bench failures --workflow ci.yml --branch main --limit 10
-gh bench failures --runs 12345678 --json
+gh bench failures -r 12345678
+gh bench failures -w ci.yml -b main -l 10
+gh bench failures --runs 12345678 --format json
+gh bench failures -w ci.yml --group
 ```
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--workflow` | | Workflow filename or name |
-| `--runs` | | Comma-separated list of run IDs |
-| `--limit` | `5` | Max failed runs to fetch |
-| `--branch` | | Filter by branch |
-| `--concurrency` | `5` | Concurrent log fetchers |
-| `--json` | `false` | Output as JSON |
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--workflow` | `-w` | | Workflow filename or name |
+| `--runs` | `-r` | | Comma-separated list of run IDs |
+| `--limit` | `-l` | `5` | Max failed runs to fetch |
+| `--branch` | `-b` | | Filter by branch |
+| `--group` | `-g` | `false` | Group identical failures across runs |
+| `--concurrency` | `-c` | `5` | Concurrent log fetchers |
+| `--format` | `-f` | `table` | Output format: `table`, `json`, `csv` |
 
 Either `--workflow` or `--runs` is required.
 

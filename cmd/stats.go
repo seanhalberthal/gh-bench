@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -18,26 +19,40 @@ var statsCmd = &cobra.Command{
 }
 
 func init() {
-	statsCmd.Flags().String("workflow", "", "Workflow filename or name")
-	statsCmd.Flags().String("runs", "", "Comma-separated list of run IDs")
-	statsCmd.Flags().String("pattern", "", "Regex with a named capture group")
-	statsCmd.Flags().Int("limit", 10, "Max number of runs to fetch")
-	statsCmd.Flags().String("branch", "", "Filter runs by branch")
-	statsCmd.Flags().String("agg", "median", "Aggregations: median, mean, p95, min, max (comma-separated)")
-	statsCmd.Flags().Int("concurrency", 5, "Number of concurrent log fetchers")
-
-	_ = statsCmd.MarkFlagRequired("pattern")
+	statsCmd.Flags().StringP("workflow", "w", "", "Workflow filename or name")
+	statsCmd.Flags().StringP("runs", "r", "", "Comma-separated list of run IDs")
+	statsCmd.Flags().StringP("pattern", "P", "", "Regex with a named capture group")
+	statsCmd.Flags().StringP("preset", "p", "", "Use a built-in pattern preset (see --list-presets)")
+	statsCmd.Flags().BoolP("list-presets", "L", false, "List available pattern presets and exit")
+	statsCmd.Flags().IntP("limit", "l", 10, "Max number of runs to fetch")
+	statsCmd.Flags().StringP("branch", "b", "", "Filter runs by branch")
+	statsCmd.Flags().StringP("agg", "a", "median", "Aggregations: median, mean, p95, min, max (comma-separated)")
+	statsCmd.Flags().IntP("concurrency", "c", 5, "Number of concurrent log fetchers")
+	statsCmd.Flags().StringP("match", "m", "first", "Which matches to extract per run: first, all")
+	statsCmd.Flags().StringP("step", "s", "", "Filter logs to a specific step name (substring match)")
 }
 
 func runStats(cmd *cobra.Command, args []string) error {
+	listPresets, _ := cmd.Flags().GetBool("list-presets")
+	if listPresets {
+		return printPresets()
+	}
+
 	workflow, _ := cmd.Flags().GetString("workflow")
 	runsFlag, _ := cmd.Flags().GetString("runs")
-	pattern, _ := cmd.Flags().GetString("pattern")
+	patternFlag, _ := cmd.Flags().GetString("pattern")
+	presetFlag, _ := cmd.Flags().GetString("preset")
 	limit, _ := cmd.Flags().GetInt("limit")
 	branch, _ := cmd.Flags().GetString("branch")
 	aggFlag, _ := cmd.Flags().GetString("agg")
 	concurrency, _ := cmd.Flags().GetInt("concurrency")
-	jsonOutput, _ := cmd.Flags().GetBool("json")
+	matchFlag, _ := cmd.Flags().GetString("match")
+	stepFlag, _ := cmd.Flags().GetString("step")
+
+	pattern, err := resolvePatternFlag(patternFlag, presetFlag)
+	if err != nil {
+		return err
+	}
 
 	if workflow == "" && runsFlag == "" {
 		return fmt.Errorf("either --workflow or --runs is required")
@@ -48,6 +63,7 @@ func runStats(cmd *cobra.Command, args []string) error {
 		Branch:      branch,
 		Limit:       limit,
 		Concurrency: concurrency,
+		Step:        stepFlag,
 	}
 
 	if runsFlag != "" {
@@ -63,18 +79,29 @@ func runStats(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("fetching logs: %w", err)
 	}
 
-	values, err := runner.ExtractValues(results, pattern)
+	matchAll := matchFlag == "all"
+	values, err := runner.ExtractValues(results, pattern, matchAll)
 	if err != nil {
 		return fmt.Errorf("extracting values: %w", err)
+	}
+
+	if len(values) == 0 {
+		fmt.Fprintf(os.Stderr, "warning: no values matched pattern %q across %d runs\n", pattern, len(results))
+		fmt.Fprintf(os.Stderr, "hint: check your regex has a named capture group (?P<name>...) and matches your log output\n")
+		return nil
 	}
 
 	aggs := strings.Split(aggFlag, ",")
 	aggResults := stats.Compute(values.Numbers(), aggs)
 
-	if jsonOutput {
+	switch resolveFormat(cmd) {
+	case "json":
 		return printStatsJSON(values, aggResults)
+	case "csv":
+		return printStatsCSV(values, aggResults)
+	default:
+		return printStatsTable(values, aggResults)
 	}
-	return printStatsTable(values, aggResults)
 }
 
 func parseRunIDs(s string) ([]int64, error) {
@@ -122,6 +149,14 @@ func printStatsJSON(values runner.ExtractedValues, aggs map[string]float64) erro
 	return nil
 }
 
+func printStatsCSV(values runner.ExtractedValues, _ map[string]float64) error {
+	fmt.Println("run_id,title,value")
+	for _, v := range values {
+		fmt.Printf("%d,%q,%s\n", v.RunID, v.Title, v.Raw)
+	}
+	return nil
+}
+
 func printStatsTable(values runner.ExtractedValues, aggs map[string]float64) error {
 	fmt.Printf("%-15s %-35s %s\n", "RUN ID", "TITLE", "VALUE")
 	for _, v := range values {
@@ -142,4 +177,30 @@ func truncate(s string, max int) string {
 		return s
 	}
 	return s[:max-1] + "…"
+}
+
+func resolvePatternFlag(pattern, preset string) (string, error) {
+	if pattern != "" && preset != "" {
+		return "", fmt.Errorf("--pattern and --preset are mutually exclusive")
+	}
+	if pattern == "" && preset == "" {
+		return "", fmt.Errorf("either --pattern or --preset is required")
+	}
+	if preset != "" {
+		return runner.ResolvePattern(preset)
+	}
+	return pattern, nil
+}
+
+func printPresets() error {
+	fmt.Println("Available pattern presets:")
+	fmt.Println()
+	for _, name := range runner.PresetNames() {
+		p := runner.Presets[name]
+		fmt.Printf("  %-14s %s\n", name, p.Description)
+		fmt.Printf("  %-14s pattern: %s\n", "", p.Pattern)
+		fmt.Printf("  %-14s e.g.    %s\n", "", p.Example)
+		fmt.Println()
+	}
+	return nil
 }

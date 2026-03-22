@@ -36,7 +36,6 @@ var (
 	dotnetErrorMsgRe = regexp.MustCompile(`\bError Message:\s*$`)
 	// Matches "Stack Trace:" header.
 	dotnetStackTraceRe = regexp.MustCompile(`\bStack Trace:\s*$`)
-
 )
 
 // Name returns the parser name.
