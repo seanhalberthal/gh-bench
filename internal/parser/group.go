@@ -1,8 +1,8 @@
 package parser
 
 import (
-	"crypto/sha256"
 	"fmt"
+	"hash/fnv"
 	"sort"
 )
 
@@ -27,8 +27,13 @@ func GroupKey(f Failure) string {
 			break
 		}
 	}
-	h := sha256.Sum256([]byte(f.Framework + "\x00" + f.TestName + "\x00" + firstLine))
-	return fmt.Sprintf("%x", h[:8])
+	h := fnv.New64a()
+	h.Write([]byte(f.Framework))
+	h.Write([]byte{0})
+	h.Write([]byte(f.TestName))
+	h.Write([]byte{0})
+	h.Write([]byte(firstLine))
+	return fmt.Sprintf("%016x", h.Sum64())
 }
 
 // GroupFailures deduplicates failures across runs, returning groups sorted
