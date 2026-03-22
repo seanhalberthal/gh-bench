@@ -19,17 +19,17 @@ var statsCmd = &cobra.Command{
 }
 
 func init() {
-	statsCmd.Flags().String("workflow", "", "Workflow filename or name")
-	statsCmd.Flags().String("runs", "", "Comma-separated list of run IDs")
-	statsCmd.Flags().String("pattern", "", "Regex with a named capture group")
-	statsCmd.Flags().String("preset", "", "Use a built-in pattern preset (see --list-presets)")
-	statsCmd.Flags().Bool("list-presets", false, "List available pattern presets and exit")
-	statsCmd.Flags().Int("limit", 10, "Max number of runs to fetch")
-	statsCmd.Flags().String("branch", "", "Filter runs by branch")
-	statsCmd.Flags().String("agg", "median", "Aggregations: median, mean, p95, min, max (comma-separated)")
-	statsCmd.Flags().Int("concurrency", 5, "Number of concurrent log fetchers")
-	statsCmd.Flags().String("match", "first", "Which matches to extract per run: first, all")
-	statsCmd.Flags().String("step", "", "Filter logs to a specific step name (substring match)")
+	statsCmd.Flags().StringP("workflow", "w", "", "Workflow filename or name")
+	statsCmd.Flags().StringP("runs", "r", "", "Comma-separated list of run IDs")
+	statsCmd.Flags().StringP("pattern", "P", "", "Regex with a named capture group")
+	statsCmd.Flags().StringP("preset", "p", "", "Use a built-in pattern preset (see --list-presets)")
+	statsCmd.Flags().BoolP("list-presets", "L", false, "List available pattern presets and exit")
+	statsCmd.Flags().IntP("limit", "l", 10, "Max number of runs to fetch")
+	statsCmd.Flags().StringP("branch", "b", "", "Filter runs by branch")
+	statsCmd.Flags().StringP("agg", "a", "median", "Aggregations: median, mean, p95, min, max (comma-separated)")
+	statsCmd.Flags().IntP("concurrency", "c", 5, "Number of concurrent log fetchers")
+	statsCmd.Flags().StringP("match", "m", "first", "Which matches to extract per run: first, all")
+	statsCmd.Flags().StringP("step", "s", "", "Filter logs to a specific step name (substring match)")
 }
 
 func runStats(cmd *cobra.Command, args []string) error {

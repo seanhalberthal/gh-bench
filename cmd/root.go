@@ -25,7 +25,7 @@ func init() {
 	rootCmd.AddCommand(statsCmd)
 	rootCmd.AddCommand(failuresCmd)
 
-	rootCmd.PersistentFlags().String("format", "table", "Output format: table, json, csv")
+	rootCmd.PersistentFlags().StringP("format", "f", "table", "Output format: table, json, csv")
 	rootCmd.PersistentFlags().Bool("json", false, "Output as JSON (shorthand for --format json)")
 	_ = rootCmd.PersistentFlags().MarkHidden("json")
 }

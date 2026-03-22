@@ -15,11 +15,11 @@ import (
 // FetchOpts configures log fetching behaviour.
 type FetchOpts struct {
 	Workflow    string
-	RunIDs     []int64
-	Branch     string
-	Limit      int
+	RunIDs      []int64
+	Branch      string
+	Limit       int
 	Concurrency int
-	FailedOnly bool
+	FailedOnly  bool
 	Step        string // Filter logs to a specific step name
 }
 

@@ -19,12 +19,12 @@ var failuresCmd = &cobra.Command{
 }
 
 func init() {
-	failuresCmd.Flags().String("workflow", "", "Workflow filename or name")
-	failuresCmd.Flags().String("runs", "", "Comma-separated list of run IDs")
-	failuresCmd.Flags().Int("limit", 5, "Max failed runs to fetch")
-	failuresCmd.Flags().String("branch", "", "Filter by branch")
-	failuresCmd.Flags().Int("concurrency", 5, "Number of concurrent log fetchers")
-	failuresCmd.Flags().Bool("group", false, "Group identical failures across runs")
+	failuresCmd.Flags().StringP("workflow", "w", "", "Workflow filename or name")
+	failuresCmd.Flags().StringP("runs", "r", "", "Comma-separated list of run IDs")
+	failuresCmd.Flags().IntP("limit", "l", 5, "Max failed runs to fetch")
+	failuresCmd.Flags().StringP("branch", "b", "", "Filter by branch")
+	failuresCmd.Flags().IntP("concurrency", "c", 5, "Number of concurrent log fetchers")
+	failuresCmd.Flags().BoolP("group", "g", false, "Group identical failures across runs")
 }
 
 func runFailures(cmd *cobra.Command, args []string) error {
@@ -111,12 +111,12 @@ func runFailures(cmd *cobra.Command, args []string) error {
 
 func printFailuresJSON(results []runner.RunResult) error {
 	type failureOutput struct {
-		RunID     int64             `json:"run_id"`
-		Title     string            `json:"title"`
-		Date      string            `json:"date"`
-		Step      string            `json:"step"`
-		Framework string            `json:"framework"`
-		Failures  []parser.Failure  `json:"failures"`
+		RunID     int64            `json:"run_id"`
+		Title     string           `json:"title"`
+		Date      string           `json:"date"`
+		Step      string           `json:"step"`
+		Framework string           `json:"framework"`
+		Failures  []parser.Failure `json:"failures"`
 	}
 
 	var output []failureOutput
@@ -236,8 +236,8 @@ func printGroupedText(groups []parser.FailureGroup, totalRuns int) error {
 
 func printGroupedJSON(groups []parser.FailureGroup, totalRuns int) error {
 	output := struct {
-		TotalRuns int                    `json:"total_runs"`
-		Groups    []parser.FailureGroup  `json:"groups"`
+		TotalRuns int                   `json:"total_runs"`
+		Groups    []parser.FailureGroup `json:"groups"`
 	}{
 		TotalRuns: totalRuns,
 		Groups:    groups,
