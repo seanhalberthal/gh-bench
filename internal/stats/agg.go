@@ -17,14 +17,30 @@ func Compute(values []float64, aggs []string) map[string]float64 {
 		return result
 	}
 
+	// Check if any aggregation needs sorted data.
+	needsSorted := false
+	for _, a := range aggs {
+		if a == "median" || a == "p95" {
+			needsSorted = true
+			break
+		}
+	}
+
+	var sorted []float64
+	if needsSorted {
+		sorted = make([]float64, len(values))
+		copy(sorted, values)
+		sort.Float64s(sorted)
+	}
+
 	for _, a := range aggs {
 		switch a {
 		case "median":
-			result["median"] = Median(values)
+			result["median"] = medianSorted(sorted)
 		case "mean":
 			result["mean"] = Mean(values)
 		case "p95":
-			result["p95"] = P95(values)
+			result["p95"] = p95Sorted(sorted)
 		case "min":
 			result["min"] = Min(values)
 		case "max":
@@ -33,6 +49,32 @@ func Compute(values []float64, aggs []string) map[string]float64 {
 	}
 
 	return result
+}
+
+// medianSorted returns the median of an already-sorted slice.
+func medianSorted(sorted []float64) float64 {
+	n := len(sorted)
+	if n == 0 {
+		return 0
+	}
+	if n%2 == 0 {
+		return (sorted[n/2-1] + sorted[n/2]) / 2
+	}
+	return sorted[n/2]
+}
+
+// p95Sorted returns the 95th percentile of an already-sorted slice.
+func p95Sorted(sorted []float64) float64 {
+	n := len(sorted)
+	if n == 0 {
+		return 0
+	}
+	rank := math.Ceil(0.95 * float64(n))
+	idx := max(int(rank)-1, 0)
+	if idx >= n {
+		idx = n - 1
+	}
+	return sorted[idx]
 }
 
 // Median returns the median of a slice of float64 values.

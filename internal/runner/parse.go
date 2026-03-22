@@ -88,16 +88,14 @@ func (ev ExtractedValues) Numbers() []float64 {
 	return nums
 }
 
-// ExtractValues applies a named capture group regex to each run's log
-// and extracts numeric values. When matchAll is true, all matches per
-// run are returned (not just the first).
-func ExtractValues(results []RunResult, pattern string, matchAll bool) (ExtractedValues, error) {
+// CompilePattern validates and compiles an extraction pattern.
+// Returns the compiled regex and the index of the first named capture group.
+func CompilePattern(pattern string) (*regexp.Regexp, int, error) {
 	re, err := regexp.Compile(pattern)
 	if err != nil {
-		return nil, fmt.Errorf("compiling pattern %q: %w", pattern, err)
+		return nil, 0, fmt.Errorf("compiling pattern %q: %w", pattern, err)
 	}
 
-	// Find the first named capture group
 	groupName := ""
 	for _, name := range re.SubexpNames() {
 		if name != "" {
@@ -106,11 +104,16 @@ func ExtractValues(results []RunResult, pattern string, matchAll bool) (Extracte
 		}
 	}
 	if groupName == "" {
-		return nil, fmt.Errorf("pattern %q must contain at least one named capture group (?P<name>...)", pattern)
+		return nil, 0, fmt.Errorf("pattern %q must contain at least one named capture group (?P<name>...)", pattern)
 	}
 
-	groupIdx := re.SubexpIndex(groupName)
+	return re, re.SubexpIndex(groupName), nil
+}
 
+// ExtractValues applies a pre-compiled regex to each run's log
+// and extracts numeric values. When matchAll is true, all matches per
+// run are returned (not just the first).
+func ExtractValues(results []RunResult, re *regexp.Regexp, groupIdx int, matchAll bool) (ExtractedValues, error) {
 	var values ExtractedValues
 	for _, r := range results {
 		var matches []string

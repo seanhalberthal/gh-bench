@@ -80,17 +80,14 @@ func (f *FallbackParser) Extract(logs string) []Failure {
 
 	rawLines := strings.Split(logs, "\n")
 
-	// Strip timestamps from all lines up front.
-	cleaned := make([]string, len(rawLines))
-	for i, line := range rawLines {
-		cleaned[i] = stripTimestamp(line)
-	}
-
-	// Collect ##[error] lines — these are the primary signal.
-	// Filter out the generic "Process completed with exit code N." which
-	// GitHub Actions always adds and carries no useful information.
+	// Single pass: strip timestamps, collect ##[error] lines, and filter boilerplate.
 	var errorMsgs []string
-	for _, line := range cleaned {
+	var filtered []string
+
+	for _, raw := range rawLines {
+		line := stripTimestamp(raw)
+
+		// Collect ##[error] lines — these are the primary signal.
 		trimmed := strings.TrimSpace(line)
 		if m := ghErrorRe.FindStringSubmatch(trimmed); m != nil {
 			msg := strings.TrimSpace(m[1])
@@ -98,13 +95,10 @@ func (f *FallbackParser) Extract(logs string) []Failure {
 				errorMsgs = append(errorMsgs, msg)
 			}
 		}
-	}
 
-	// Build the tail, filtering out boilerplate.
-	var filtered []string
-	for _, line := range cleaned {
+		// Filter boilerplate for the tail.
 		if !isBoilerplate(line) {
-			filtered = append(filtered, strings.TrimSpace(line))
+			filtered = append(filtered, trimmed)
 		}
 	}
 

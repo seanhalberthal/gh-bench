@@ -27,6 +27,19 @@ func init() {
 	failuresCmd.Flags().BoolP("group", "g", false, "Group identical failures across runs")
 }
 
+// enrichedStep holds a step result with pre-parsed failure data.
+type enrichedStep struct {
+	runner.StepResult
+	Failures  []parser.Failure
+	Framework string
+}
+
+// enrichedRun holds a run result with pre-parsed steps.
+type enrichedRun struct {
+	runner.RunResult
+	Steps []enrichedStep
+}
+
 func runFailures(cmd *cobra.Command, args []string) error {
 	workflow, _ := cmd.Flags().GetString("workflow")
 	runsFlag, _ := cmd.Flags().GetString("runs")
@@ -74,22 +87,36 @@ func runFailures(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	// Parse each step log exactly once and build enriched results.
+	enriched := make([]enrichedRun, len(results))
 	totalFailures := 0
-	for _, r := range results {
-		for _, step := range r.FailedSteps {
-			totalFailures += len(parser.Parse(step.Log))
+	for ri, r := range results {
+		er := enrichedRun{RunResult: r, Steps: make([]enrichedStep, len(r.FailedSteps))}
+		for si, step := range r.FailedSteps {
+			failures := parser.Parse(step.Log)
+			fw := "unknown"
+			if len(failures) > 0 {
+				fw = failures[0].Framework
+			}
+			er.Steps[si] = enrichedStep{
+				StepResult: step,
+				Failures:   failures,
+				Framework:  fw,
+			}
+			totalFailures += len(failures)
 		}
+		enriched[ri] = er
 	}
+
 	if totalFailures == 0 {
 		fmt.Fprintf(os.Stderr, "warning: %d failed runs found but no structured failures extracted (framework not detected?)\n", len(results))
 	}
 
 	if groupFlag {
 		runFailures := make(map[int64][]parser.Failure)
-		for _, r := range results {
-			for _, step := range r.FailedSteps {
-				failures := parser.Parse(step.Log)
-				runFailures[r.RunID] = append(runFailures[r.RunID], failures...)
+		for _, er := range enriched {
+			for _, step := range er.Steps {
+				runFailures[er.RunID] = append(runFailures[er.RunID], step.Failures...)
 			}
 		}
 		groups := parser.GroupFailures(runFailures)
@@ -103,15 +130,15 @@ func runFailures(cmd *cobra.Command, args []string) error {
 
 	switch resolveFormat(cmd) {
 	case "json":
-		return printFailuresJSON(results)
+		return printFailuresJSON(enriched)
 	case "csv":
-		return printFailuresCSV(results)
+		return printFailuresCSV(enriched)
 	default:
-		return printFailuresText(results)
+		return printFailuresText(enriched)
 	}
 }
 
-func printFailuresJSON(results []runner.RunResult) error {
+func printFailuresJSON(enriched []enrichedRun) error {
 	type failureOutput struct {
 		RunID     int64            `json:"run_id"`
 		Title     string           `json:"title"`
@@ -122,20 +149,15 @@ func printFailuresJSON(results []runner.RunResult) error {
 	}
 
 	var output []failureOutput
-	for _, r := range results {
-		for _, step := range r.FailedSteps {
-			failures := parser.Parse(step.Log)
-			fw := "unknown"
-			if len(failures) > 0 {
-				fw = failures[0].Framework
-			}
+	for _, r := range enriched {
+		for _, step := range r.Steps {
 			output = append(output, failureOutput{
 				RunID:     r.RunID,
 				Title:     r.Title,
 				Date:      r.Date,
 				Step:      step.Name,
-				Framework: fw,
-				Failures:  failures,
+				Framework: step.Framework,
+				Failures:  step.Failures,
 			})
 		}
 	}
@@ -148,68 +170,60 @@ func printFailuresJSON(results []runner.RunResult) error {
 	return nil
 }
 
-func printFailuresCSV(results []runner.RunResult) error {
+func printFailuresCSV(enriched []enrichedRun) error {
 	fmt.Println("run_id,title,date,step,framework,test_name,message,location")
-	for _, r := range results {
-		for _, step := range r.FailedSteps {
-			failures := parser.Parse(step.Log)
-			fw := "unknown"
-			if len(failures) > 0 {
-				fw = failures[0].Framework
-			}
-			for _, f := range failures {
+	for _, r := range enriched {
+		for _, step := range r.Steps {
+			for _, f := range step.Failures {
 				fmt.Printf("%d,%q,%q,%q,%q,%q,%q,%q\n",
 					r.RunID, r.Title, r.Date, step.Name,
-					fw, f.TestName, f.Message, f.Location)
+					step.Framework, f.TestName, f.Message, f.Location)
 			}
 		}
 	}
 	return nil
 }
 
-func printFailuresText(results []runner.RunResult) error {
-	for i, r := range results {
+func printFailuresText(enriched []enrichedRun) error {
+	var b strings.Builder
+
+	for i, r := range enriched {
 		if i > 0 {
-			fmt.Println(strings.Repeat("─", 68))
+			b.WriteString(strings.Repeat("─", 68))
+			b.WriteByte('\n')
 		}
-		for _, step := range r.FailedSteps {
-			failures := parser.Parse(step.Log)
-			fw := "unknown"
-			if len(failures) > 0 {
-				fw = failures[0].Framework
-			}
+		for _, step := range r.Steps {
+			fmt.Fprintf(&b, "● RUN %d — %s (%s)\n", r.RunID, r.Title, r.Date)
+			fmt.Fprintf(&b, "  Step: %s\n", step.Name)
+			fmt.Fprintf(&b, "  Framework: %s\n\n", step.Framework)
 
-			fmt.Printf("● RUN %d — %s (%s)\n", r.RunID, r.Title, r.Date)
-			fmt.Printf("  Step: %s\n", step.Name)
-			fmt.Printf("  Framework: %s\n", fw)
-			fmt.Println()
-
-			if len(failures) == 0 {
-				fmt.Println("  No structured failures extracted.")
-				fmt.Println()
+			if len(step.Failures) == 0 {
+				b.WriteString("  No structured failures extracted.\n\n")
 				continue
 			}
 
-			fmt.Printf("  Failed Tests (%d)\n\n", len(failures))
-			for _, f := range failures {
+			fmt.Fprintf(&b, "  Failed Tests (%d)\n\n", len(step.Failures))
+			for _, f := range step.Failures {
 				if f.Duration != "" {
-					fmt.Printf("  ✗ %s [%s]\n", f.TestName, f.Duration)
+					fmt.Fprintf(&b, "  ✗ %s [%s]\n", f.TestName, f.Duration)
 				} else {
-					fmt.Printf("  ✗ %s\n", f.TestName)
+					fmt.Fprintf(&b, "  ✗ %s\n", f.TestName)
 				}
 				if f.Message != "" {
 					for line := range strings.SplitSeq(f.Message, "\n") {
-						fmt.Printf("      %s\n", line)
+						fmt.Fprintf(&b, "      %s\n", line)
 					}
 				}
 				if f.Location != "" {
-					fmt.Printf("      at %s\n", f.Location)
+					fmt.Fprintf(&b, "      at %s\n", f.Location)
 				}
-				fmt.Println()
+				b.WriteByte('\n')
 			}
 		}
 	}
-	return nil
+
+	_, err := os.Stdout.WriteString(b.String())
+	return err
 }
 
 func printGroupedText(groups []parser.FailureGroup, totalRuns int) error {
@@ -218,22 +232,24 @@ func printGroupedText(groups []parser.FailureGroup, totalRuns int) error {
 		return nil
 	}
 
-	fmt.Printf("Failure groups across %d runs (%d unique)\n\n", totalRuns, len(groups))
+	var b strings.Builder
+	fmt.Fprintf(&b, "Failure groups across %d runs (%d unique)\n\n", totalRuns, len(groups))
 
 	for _, g := range groups {
-		fmt.Printf("  ✗ %s  [%d/%d runs]\n", g.TestName, g.Count, totalRuns)
+		fmt.Fprintf(&b, "  ✗ %s  [%d/%d runs]\n", g.TestName, g.Count, totalRuns)
 		if g.Message != "" {
 			for line := range strings.SplitSeq(g.Message, "\n") {
-				fmt.Printf("      %s\n", line)
+				fmt.Fprintf(&b, "      %s\n", line)
 			}
 		}
 		if g.Location != "" {
-			fmt.Printf("      at %s\n", g.Location)
+			fmt.Fprintf(&b, "      at %s\n", g.Location)
 		}
-		fmt.Printf("      framework: %s\n", g.Framework)
-		fmt.Println()
+		fmt.Fprintf(&b, "      framework: %s\n\n", g.Framework)
 	}
-	return nil
+
+	_, err := os.Stdout.WriteString(b.String())
+	return err
 }
 
 func printGroupedJSON(groups []parser.FailureGroup, totalRuns int) error {

@@ -21,10 +21,10 @@
 2026-03-20T12:19:23.6918646Z   DOTNET_CLI_TELEMETRY_OPTOUT: true
 2026-03-20T12:19:23.6919638Z   GCP_REGION: europe-west2
 2026-03-20T12:19:23.6920450Z   ARTIFACT_REGISTRY: europe-west2-docker.pkg.dev
-2026-03-20T12:19:23.6921636Z   GCP_PROJECT_ID: dana-artefacts
-2026-03-20T12:19:23.6922897Z   DOCKER_REGISTRY: europe-west2-docker.pkg.dev/dana-artefacts/dana-containers
-2026-03-20T12:19:23.6944806Z   IMAGE_NAME: dana-api
-2026-03-20T12:19:23.6945757Z   CI_ARTEFACTS_BUCKET: dana-ci-artefacts
+2026-03-20T12:19:23.6921636Z   GCP_PROJECT_ID: acme-artefacts
+2026-03-20T12:19:23.6922897Z   DOCKER_REGISTRY: europe-west2-docker.pkg.dev/acme-artefacts/acme-containers
+2026-03-20T12:19:23.6944806Z   IMAGE_NAME: acme-api
+2026-03-20T12:19:23.6945757Z   CI_ARTEFACTS_BUCKET: acme-ci-artefacts
 2026-03-20T12:19:23.6946788Z ##[endgroup]
 2026-03-20T12:19:23.7192702Z Backend tests failed
 2026-03-20T12:19:23.7214670Z ##[error]Process completed with exit code 1.

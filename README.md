@@ -121,9 +121,9 @@ The fallback parser strips GitHub Actions boilerplate (env vars, annotations, cl
 $ gh bench stats --workflow ci.yml --pattern 'Total time:\s*(?P<seconds>[0-9.]+)s' --agg median,p95
 
 RUN ID          TITLE                           VALUE
-23364348137     DANA-1338 Replace law firm ...   84.5
-23348219428     DANA-1335 Add Roslyn analys...   91.0
-23341291675     DANA-1332 Rename hooks ...       103.2
+23364348137     ACME-1338 Replace law firm ...   84.5
+23348219428     ACME-1335 Add Roslyn analys...   91.0
+23341291675     ACME-1332 Rename hooks ...       103.2
 ────────────────────────────────────────────────────────────────────
 median: 91.0  p95: 103.2
 ```
@@ -133,13 +133,13 @@ median: 91.0  p95: 103.2
 ```bash
 $ gh bench failures --runs 23341983210
 
-● RUN 23341983210 — DANA-1335 Add Roslyn analyser (2026-03-20T12:03:31Z)
+● RUN 23341983210 — ACME-1335 Add Roslyn analyser (2026-03-20T12:03:31Z)
   Step: Run integration-platform tests
   Framework: dotnet
 
   Failed Tests (1)
 
-  ✗ Dana.IntegrationTests.TokenManagement.ExchangeCodeForTokens_ReturnsBadRequest [1 s]
+  ✗ Acme.IntegrationTests.TokenManagement.ExchangeCodeForTokens_ReturnsBadRequest [1 s]
       Shouldly.ShouldAssertException : errors[0].Reason
       should start with "Microsoft 365 authentication fai"
       but was "An unexpected error occurred..."
@@ -150,7 +150,7 @@ $ gh bench failures --runs 23341983210
 
 ```bash
 $ gh bench failures --runs 23341983210 --json | jq '.[].failures[].test_name'
-"Dana.IntegrationTests.TokenManagement.ExchangeCodeForTokens_ReturnsBadRequest"
+"Acme.IntegrationTests.TokenManagement.ExchangeCodeForTokens_ReturnsBadRequest"
 ```
 
 ---

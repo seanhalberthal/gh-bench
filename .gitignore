@@ -1,6 +1,6 @@
 # AI Tools
-/.claude
-!/.claude/commands
+/.claude/*
+!/.claude/commands/
 
 # Binary
 /gh-bench
