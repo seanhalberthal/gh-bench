@@ -2,11 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"time"
 
-	"github.com/briandowns/spinner"
-	"github.com/mattn/go-isatty"
+	"github.com/charmbracelet/huh/spinner"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
@@ -44,16 +42,22 @@ func resolveFormat(cmd *cobra.Command) string {
 	return format
 }
 
-// startSpinner creates and starts a stderr spinner if stderr is a terminal.
-// Returns a stop function that is always safe to call.
-func startSpinner(suffix string) func() {
-	if !isatty.IsTerminal(os.Stderr.Fd()) && !isatty.IsCygwinTerminal(os.Stderr.Fd()) {
-		return func() {}
+// withSpinner runs fn while displaying a terminal spinner with the given title.
+// The spinner renders to stderr so it doesn't interfere with command output.
+func withSpinner[T any](title string, fn func() (T, error)) (T, error) {
+	var result T
+	var fnErr error
+	style := lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+	err := spinner.New().
+		Title(title).
+		Type(spinner.Dots).
+		Style(style).
+		Action(func() { result, fnErr = fn() }).
+		Run()
+	if fnErr != nil {
+		return result, fnErr
 	}
-	s := spinner.New(spinner.CharSets[14], 100*time.Millisecond, spinner.WithWriter(os.Stderr))
-	s.Suffix = " " + suffix
-	s.Start()
-	return func() { s.Stop() }
+	return result, err
 }
 
 // Execute runs the root command.
