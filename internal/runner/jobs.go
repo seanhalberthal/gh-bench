@@ -146,21 +146,27 @@ func fetchJobLog(jobID, runID int64) (string, error) {
 
 // stripLogPrefixes removes job\tstep\t prefixes from gh run view --log output.
 func stripLogPrefixes(log string) string {
-	lines := strings.Split(log, "\n")
-	out := make([]string, 0, len(lines))
-	for _, line := range lines {
+	var b strings.Builder
+	b.Grow(len(log))
+
+	for line := range strings.SplitSeq(log, "\n") {
+		if b.Len() > 0 {
+			b.WriteByte('\n')
+		}
+
 		first := strings.IndexByte(line, '\t')
 		if first < 0 {
-			out = append(out, line)
+			b.WriteString(line)
 			continue
 		}
 		rest := line[first+1:]
 		second := strings.IndexByte(rest, '\t')
 		if second < 0 {
-			out = append(out, line)
+			b.WriteString(line)
 			continue
 		}
-		out = append(out, rest[second+1:])
+		b.WriteString(rest[second+1:])
 	}
-	return strings.Join(out, "\n")
+
+	return b.String()
 }
