@@ -1,10 +1,13 @@
 package runner
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
+
+	"golang.org/x/sync/errgroup"
 )
 
 // Job represents a GitHub Actions job.
@@ -60,34 +63,59 @@ func GetFailedSteps(runID int64) ([]StepResult, error) {
 		return nil, fmt.Errorf("parsing jobs JSON: %w", err)
 	}
 
-	var failedSteps []StepResult
+	// Collect failed/cancelled jobs that need log fetches.
+	type jobSteps struct {
+		job   Job
+		steps []Step
+	}
+	var toFetch []jobSteps
 	for _, job := range result.Jobs {
-		// Process failed and cancelled jobs — a cancelled job can still
-		// contain steps that failed before the cancellation (e.g. fail-fast matrix).
 		if job.Conclusion != "failure" && job.Conclusion != "cancelled" {
 			continue
 		}
-
-		// Fetch the raw log for this job via the REST API.
-		// This is ~2x faster than gh run view --log and produces clean
-		// output without "UNKNOWN STEP" artifacts.
-		jobLog, err := fetchJobLog(job.DatabaseID, runID)
-		if err != nil {
-			return nil, fmt.Errorf("fetching log for job %d: %w", job.DatabaseID, err)
-		}
-
+		var failed []Step
 		for _, step := range job.Steps {
-			// Include failed steps and cancelled steps (a cancelled step may
-			// have produced test failure output before being interrupted).
 			if step.Conclusion != "failure" && step.Conclusion != "cancelled" {
 				continue
 			}
 			if shouldSkipStep(step.Name) {
 				continue
 			}
+			failed = append(failed, step)
+		}
+		if len(failed) > 0 {
+			toFetch = append(toFetch, jobSteps{job: job, steps: failed})
+		}
+	}
+
+	if len(toFetch) == 0 {
+		return nil, nil
+	}
+
+	// Fetch job logs in parallel.
+	logs := make([]string, len(toFetch))
+	g, _ := errgroup.WithContext(context.Background())
+	for i, js := range toFetch {
+		g.Go(func() error {
+			log, err := fetchJobLog(js.job.DatabaseID, runID)
+			if err != nil {
+				return fmt.Errorf("fetching log for job %d: %w", js.job.DatabaseID, err)
+			}
+			logs[i] = log
+			return nil
+		})
+	}
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
+	// Assemble step results.
+	var failedSteps []StepResult
+	for i, js := range toFetch {
+		for _, step := range js.steps {
 			failedSteps = append(failedSteps, StepResult{
 				Name: step.Name,
-				Log:  jobLog,
+				Log:  logs[i],
 			})
 		}
 	}
