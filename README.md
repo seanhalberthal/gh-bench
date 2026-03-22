@@ -91,6 +91,7 @@ gh bench failures -w ci.yml --group
 | `--limit` | `-l` | `5` | Max failed runs to fetch |
 | `--branch` | `-b` | | Filter by branch |
 | `--group` | `-g` | `false` | Group identical failures across runs |
+| `--exclude-step` | `-x` | | Exclude steps matching name (case-insensitive substring, repeatable) |
 | `--concurrency` | `-c` | `5` | Concurrent log fetchers |
 | `--format` | `-f` | `table` | Output format: `table`, `json`, `csv` |
 
@@ -152,6 +153,29 @@ $ gh bench failures --runs 23341983210
 $ gh bench failures --runs 23341983210 --json | jq '.[].failures[].test_name'
 "Acme.IntegrationTests.TokenManagement.ExchangeCodeForTokens_ReturnsBadRequest"
 ```
+
+---
+
+## Configuration
+
+Create a `.gh-bench.yml` file in your repository root to set project-level defaults. CLI flags override config values when explicitly set.
+
+```yaml
+# .gh-bench.yml
+workflow: ci.yml
+
+failures:
+  exclude-steps:
+    - "Check CI status"
+    - "Summary"
+```
+
+| Key | Applies to | Description |
+|-----|------------|-------------|
+| `workflow` | `stats`, `failures` | Default workflow (replaces `--workflow` flag) |
+| `failures.exclude-steps` | `failures` | Steps to exclude by name (replaces `--exclude-step` flag) |
+
+The config file is discovered by walking up from the current directory to the nearest `.git` root.
 
 ---
 

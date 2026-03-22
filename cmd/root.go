@@ -5,11 +5,15 @@ import (
 
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/seanhalberthal/gh-bench/internal/config"
 	"github.com/spf13/cobra"
 )
 
 // Version is set at build time via ldflags.
 var Version = "dev"
+
+// cfg holds the project-level config loaded from .gh-bench.yml.
+var cfg config.Config
 
 var rootCmd = &cobra.Command{
 	Use:   "bench",
@@ -17,6 +21,11 @@ var rootCmd = &cobra.Command{
 	Long:  "gh bench extracts numeric values from CI run logs, aggregates stats, and surfaces structured errors from failed runs.",
 	Annotations: map[string]string{
 		cobra.CommandDisplayNameAnnotation: "gh bench",
+	},
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		var err error
+		cfg, err = config.Load()
+		return err
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmd.Help()

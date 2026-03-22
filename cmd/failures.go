@@ -25,6 +25,7 @@ func init() {
 	failuresCmd.Flags().StringP("branch", "b", "", "Filter by branch")
 	failuresCmd.Flags().IntP("concurrency", "c", 5, "Number of concurrent log fetchers")
 	failuresCmd.Flags().BoolP("group", "g", false, "Group identical failures across runs")
+	failuresCmd.Flags().StringSliceP("exclude-step", "x", nil, "Exclude steps matching these names (case-insensitive substring, repeatable)")
 }
 
 // enrichedStep holds a step result with pre-parsed failure data.
@@ -47,17 +48,27 @@ func runFailures(cmd *cobra.Command, args []string) error {
 	branch, _ := cmd.Flags().GetString("branch")
 	concurrency, _ := cmd.Flags().GetInt("concurrency")
 	groupFlag, _ := cmd.Flags().GetBool("group")
+	excludeSteps, _ := cmd.Flags().GetStringSlice("exclude-step")
+
+	// Apply config defaults when flags aren't explicitly set.
+	if workflow == "" && cfg.Workflow != "" {
+		workflow = cfg.Workflow
+	}
+	if !cmd.Flags().Changed("exclude-step") && len(cfg.Failures.ExcludeSteps) > 0 {
+		excludeSteps = cfg.Failures.ExcludeSteps
+	}
 
 	if workflow == "" && runsFlag == "" {
 		return fmt.Errorf("either --workflow or --runs is required")
 	}
 
 	opts := runner.FetchOpts{
-		Workflow:    workflow,
-		Branch:      branch,
-		Limit:       limit,
-		Concurrency: concurrency,
-		FailedOnly:  true,
+		Workflow:     workflow,
+		Branch:       branch,
+		Limit:        limit,
+		Concurrency:  concurrency,
+		FailedOnly:   true,
+		ExcludeSteps: excludeSteps,
 	}
 
 	if runsFlag != "" {

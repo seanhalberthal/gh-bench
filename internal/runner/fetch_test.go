@@ -171,6 +171,45 @@ func TestListRunIDs_EmptyOutput(t *testing.T) {
 	}
 }
 
+func TestFilterExcludedSteps(t *testing.T) {
+	steps := []StepResult{
+		{Name: "Run tests"},
+		{Name: "Check CI status"},
+		{Name: "Build and deploy"},
+		{Name: "Verify CI Status Check"},
+	}
+
+	tests := []struct {
+		name     string
+		excludes []string
+		want     []string
+	}{
+		{"no excludes", nil, []string{"Run tests", "Check CI status", "Build and deploy", "Verify CI Status Check"}},
+		{"exclude one", []string{"CI status"}, []string{"Run tests", "Build and deploy"}},
+		{"case insensitive", []string{"check ci"}, []string{"Run tests", "Build and deploy", "Verify CI Status Check"}},
+		{"multiple excludes", []string{"CI status", "deploy"}, []string{"Run tests"}},
+		{"no match", []string{"lint"}, []string{"Run tests", "Check CI status", "Build and deploy", "Verify CI Status Check"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Copy input to avoid mutation across subtests.
+			input := make([]StepResult, len(steps))
+			copy(input, steps)
+
+			got := filterExcludedSteps(input, tt.excludes)
+			if len(got) != len(tt.want) {
+				t.Fatalf("got %d steps, want %d", len(got), len(tt.want))
+			}
+			for i, s := range got {
+				if s.Name != tt.want[i] {
+					t.Errorf("step[%d] = %q, want %q", i, s.Name, tt.want[i])
+				}
+			}
+		})
+	}
+}
+
 func TestListRunIDs_InvalidID(t *testing.T) {
 	stub := newStubExecutor()
 	stub.handlers["run list"] = "abc\n"

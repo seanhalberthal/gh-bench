@@ -54,6 +54,11 @@ func runStats(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Apply config defaults when flags aren't explicitly set.
+	if workflow == "" && cfg.Workflow != "" {
+		workflow = cfg.Workflow
+	}
+
 	if workflow == "" && runsFlag == "" {
 		return fmt.Errorf("either --workflow or --runs is required")
 	}
