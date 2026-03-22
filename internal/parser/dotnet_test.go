@@ -49,7 +49,7 @@ func TestDotnetParser_Extract_XUnit(t *testing.T) {
 	}
 
 	f1 := failures[0]
-	if f1.TestName != "Dana.Tests.Search.GlobalSearchTests.Returns_Results_For_Partial_Match" {
+	if f1.TestName != "Acme.Tests.Search.GlobalSearchTests.Returns_Results_For_Partial_Match" {
 		t.Errorf("unexpected test name: %s", f1.TestName)
 	}
 	if f1.Duration != "45ms" {
@@ -63,7 +63,7 @@ func TestDotnetParser_Extract_XUnit(t *testing.T) {
 	}
 
 	f2 := failures[1]
-	if f2.TestName != "Dana.Tests.Search.GlobalSearchTests.Excludes_Hidden_Participants" {
+	if f2.TestName != "Acme.Tests.Search.GlobalSearchTests.Excludes_Hidden_Participants" {
 		t.Errorf("unexpected test name: %s", f2.TestName)
 	}
 	if f2.Duration != "12ms" {
@@ -80,7 +80,7 @@ func TestDotnetParser_Extract_NUnit(t *testing.T) {
 		t.Fatalf("expected 1 failure, got %d", len(failures))
 	}
 
-	if failures[0].TestName != "Dana.Tests.Data.MigrationTests.Can_Apply_All_Migrations" {
+	if failures[0].TestName != "Acme.Tests.Data.MigrationTests.Can_Apply_All_Migrations" {
 		t.Errorf("unexpected test name: %s", failures[0].TestName)
 	}
 }
@@ -143,7 +143,7 @@ func TestDotnetParser_Extract_CI_WithTimestamps(t *testing.T) {
 	}
 
 	f1 := failures[0]
-	if f1.TestName != "Dana.Tests.Hearings.CreateHearingTests.Chambersadmin_Can_Create_Hearing" {
+	if f1.TestName != "Acme.Tests.Hearings.CreateHearingTests.Chambersadmin_Can_Create_Hearing" {
 		t.Errorf("unexpected test name: %s", f1.TestName)
 	}
 	if f1.Duration != "156ms" {
@@ -154,7 +154,7 @@ func TestDotnetParser_Extract_CI_WithTimestamps(t *testing.T) {
 	}
 
 	f2 := failures[1]
-	if f2.TestName != "Dana.Tests.Hearings.CreateHearingTests.Returns_Validation_Error_For_Missing_Fields" {
+	if f2.TestName != "Acme.Tests.Hearings.CreateHearingTests.Returns_Validation_Error_For_Missing_Fields" {
 		t.Errorf("unexpected test name: %s", f2.TestName)
 	}
 }
@@ -175,7 +175,7 @@ func TestDotnetParser_Extract_ParameterisedTestWithSpaces(t *testing.T) {
 	f := failures[0]
 
 	// Full parameterised test name must be captured.
-	if !strings.HasPrefix(f.TestName, "Dana.IntegrationTests.TokenManagement") {
+	if !strings.HasPrefix(f.TestName, "Acme.IntegrationTests.TokenManagement") {
 		t.Errorf("unexpected test name: %s", f.TestName)
 	}
 	if !strings.Contains(f.TestName, "Microsoft 365") {

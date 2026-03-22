@@ -4,9 +4,9 @@ Runtime Environment
    OS Platform: Linux
 
 Test Files
-    /app/tests/Dana.Tests.dll
+    /app/tests/Acme.Tests.dll
 
-  Failed Dana.Tests.Data.MigrationTests.Can_Apply_All_Migrations [230ms]
+  Failed Acme.Tests.Data.MigrationTests.Can_Apply_All_Migrations [230ms]
       System.Data.SqlClient.SqlException: Invalid column name 'CaseRef'
       at System.Data.SqlClient.SqlConnection.OnError() in SqlConnection.cs:line 487
 

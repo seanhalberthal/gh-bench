@@ -1,8 +1,8 @@
 Determining projects to restore...
   All projects are up-to-date for restore.
-  Dana.Api -> /app/src/Dana.Api/bin/Release/net8.0/Dana.Api.dll
-  Dana.Tests -> /app/tests/Dana.Tests/bin/Release/net8.0/Dana.Tests.dll
-Test run for /app/tests/Dana.Tests/bin/Release/net8.0/Dana.Tests.dll (.NETCoreApp,Version=v8.0)
+  Acme.Api -> /app/src/Acme.Api/bin/Release/net8.0/Acme.Api.dll
+  Acme.Tests -> /app/tests/Acme.Tests/bin/Release/net8.0/Acme.Tests.dll
+Test run for /app/tests/Acme.Tests/bin/Release/net8.0/Acme.Tests.dll (.NETCoreApp,Version=v8.0)
 Microsoft (R) Test Execution Engine
 Results File: /app/tests/TestResults/results.trx
 
