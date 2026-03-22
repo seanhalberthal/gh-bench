@@ -28,17 +28,17 @@ var Presets = map[string]Preset{
 		Example:     "Coverage: 85.2%, coverage=91%",
 	},
 	"go-test": {
-		Pattern:     `^ok\s+\S+\s+(?P<duration>[0-9.]+)s`,
-		Description: "Go test package duration",
+		Pattern:     `^ok\s+(?P<label>\S+)\s+(?P<duration>[0-9.]+)s`,
+		Description: "Go test package duration (labelled by package)",
 		Example:     "ok  github.com/foo/bar  1.234s",
 	},
 	"jest": {
-		Pattern:     `(?i)time\s*:\s*(?P<duration>[0-9.]+)\s*(?:ms|s)`,
+		Pattern:     `(?i)(?:time|duration)\s*:?\s+(?P<duration>[0-9.]+)\s*(?:ms|s)\b`,
 		Description: "Jest/Vitest test suite time",
 		Example:     "Time:        4.589 s",
 	},
 	"pytest": {
-		Pattern:     `(?i)passed in\s+(?P<duration>[0-9.]+)s`,
+		Pattern:     `(?i)passed.*?\bin\s+(?P<duration>[0-9.]+)s`,
 		Description: "Pytest suite duration",
 		Example:     "42 passed in 3.45s",
 	},
@@ -72,6 +72,7 @@ func ResolvePattern(name string) (string, error) {
 type ExtractedValue struct {
 	RunID int64
 	Title string
+	Label string // populated when pattern contains (?P<label>...)
 	Raw   string
 	Value float64
 }
@@ -88,52 +89,74 @@ func (ev ExtractedValues) Numbers() []float64 {
 	return nums
 }
 
+// HasLabels returns true if any value has a label.
+func (ev ExtractedValues) HasLabels() bool {
+	for _, v := range ev {
+		if v.Label != "" {
+			return true
+		}
+	}
+	return false
+}
+
 // CompilePattern validates and compiles an extraction pattern.
-// Returns the compiled regex and the index of the first named capture group.
-func CompilePattern(pattern string) (*regexp.Regexp, int, error) {
+// Returns the compiled regex, the value group index, and the label group index
+// (-1 if no (?P<label>...) group is present).
+func CompilePattern(pattern string) (*regexp.Regexp, int, int, error) {
 	re, err := regexp.Compile(pattern)
 	if err != nil {
-		return nil, 0, fmt.Errorf("compiling pattern %q: %w", pattern, err)
+		return nil, 0, -1, fmt.Errorf("compiling pattern %q: %w", pattern, err)
 	}
 
-	groupName := ""
+	// Find the first named group that isn't "label" — that's the value group.
+	valueGroup := ""
 	for _, name := range re.SubexpNames() {
-		if name != "" {
-			groupName = name
+		if name != "" && name != "label" {
+			valueGroup = name
 			break
 		}
 	}
-	if groupName == "" {
-		return nil, 0, fmt.Errorf("pattern %q must contain at least one named capture group (?P<name>...)", pattern)
+	if valueGroup == "" {
+		return nil, 0, -1, fmt.Errorf("pattern %q must contain at least one named capture group (?P<name>...) for numeric extraction", pattern)
 	}
 
-	return re, re.SubexpIndex(groupName), nil
+	labelIdx := re.SubexpIndex("label") // -1 if not present
+
+	return re, re.SubexpIndex(valueGroup), labelIdx, nil
+}
+
+// matchResult holds a single regex match with optional label.
+type matchResult struct {
+	value string
+	label string
 }
 
 // ExtractValues applies a pre-compiled regex to each run's log
 // and extracts numeric values. When matchAll is true, all matches per
-// run are returned (not just the first).
-func ExtractValues(results []RunResult, re *regexp.Regexp, groupIdx int, matchAll bool) (ExtractedValues, error) {
+// run are returned (not just the first). labelIdx is the index of the
+// optional (?P<label>...) group (-1 if absent).
+func ExtractValues(results []RunResult, re *regexp.Regexp, groupIdx, labelIdx int, matchAll bool) (ExtractedValues, error) {
 	var values ExtractedValues
 	for _, r := range results {
-		var matches []string
+		var matches []matchResult
 		if matchAll {
-			matches = findAllMatches(re, r.Log, groupIdx)
+			matches = findAllMatches(re, r.Log, groupIdx, labelIdx)
 		} else {
-			if m := findFirstMatch(re, r.Log, groupIdx); m != "" {
-				matches = []string{m}
+			if m, ok := findFirstMatch(re, r.Log, groupIdx, labelIdx); ok {
+				matches = []matchResult{m}
 			}
 		}
 
 		for _, match := range matches {
-			num, err := strconv.ParseFloat(match, 64)
+			num, err := strconv.ParseFloat(match.value, 64)
 			if err != nil {
-				return nil, fmt.Errorf("value %q from run %d is not numeric: %w", match, r.RunID, err)
+				return nil, fmt.Errorf("value %q from run %d is not numeric: %w", match.value, r.RunID, err)
 			}
 			values = append(values, ExtractedValue{
 				RunID: r.RunID,
 				Title: r.Title,
-				Raw:   match,
+				Label: match.label,
+				Raw:   match.value,
 				Value: num,
 			})
 		}
@@ -142,24 +165,32 @@ func ExtractValues(results []RunResult, re *regexp.Regexp, groupIdx int, matchAl
 	return values, nil
 }
 
-// findFirstMatch finds the first match of the regex in the log and returns the named group value.
-func findFirstMatch(re *regexp.Regexp, log string, groupIdx int) string {
+// findFirstMatch finds the first match of the regex in the log.
+func findFirstMatch(re *regexp.Regexp, log string, groupIdx, labelIdx int) (matchResult, bool) {
 	for line := range strings.SplitSeq(log, "\n") {
 		match := re.FindStringSubmatch(line)
 		if match != nil && groupIdx < len(match) {
-			return match[groupIdx]
+			mr := matchResult{value: match[groupIdx]}
+			if labelIdx >= 0 && labelIdx < len(match) {
+				mr.label = match[labelIdx]
+			}
+			return mr, true
 		}
 	}
-	return ""
+	return matchResult{}, false
 }
 
 // findAllMatches returns every match of the regex's named group across all lines.
-func findAllMatches(re *regexp.Regexp, log string, groupIdx int) []string {
-	var results []string
+func findAllMatches(re *regexp.Regexp, log string, groupIdx, labelIdx int) []matchResult {
+	var results []matchResult
 	for line := range strings.SplitSeq(log, "\n") {
 		match := re.FindStringSubmatch(line)
 		if match != nil && groupIdx < len(match) {
-			results = append(results, match[groupIdx])
+			mr := matchResult{value: match[groupIdx]}
+			if labelIdx >= 0 && labelIdx < len(match) {
+				mr.label = match[labelIdx]
+			}
+			results = append(results, mr)
 		}
 	}
 	return results

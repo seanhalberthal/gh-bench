@@ -1,19 +1,19 @@
-2026-03-20T12:15:10.1234567Z Starting test execution, please wait...
-2026-03-20T12:15:10.2345678Z A total of 3 test files matched the specified pattern.
-2026-03-20T12:15:15.3456789Z   Passed Acme.Tests.Auth.LoginTests.Successful_Login [22ms]
-2026-03-20T12:15:15.4567890Z   Passed Acme.Tests.Auth.LoginTests.Invalid_Password_Returns_401 [8ms]
-2026-03-20T12:15:15.5678901Z   Failed Acme.Tests.Hearings.CreateHearingTests.Chambersadmin_Can_Create_Hearing [156ms]
-2026-03-20T12:15:15.6789012Z   Error Message:
-2026-03-20T12:15:15.7890123Z    System.Net.Http.HttpRequestException: Response status code does not indicate success: 403 (Forbidden).
-2026-03-20T12:15:15.8901234Z   Stack Trace:
-2026-03-20T12:15:15.9012345Z      at Acme.Tests.Helpers.ApiClient.PostAsync() in ApiClient.cs:line 45
-2026-03-20T12:15:15.9123456Z      at Acme.Tests.Hearings.CreateHearingTests.Chambersadmin_Can_Create_Hearing() in CreateHearingTests.cs:line 28
-2026-03-20T12:15:16.0234567Z   Failed Acme.Tests.Hearings.CreateHearingTests.Returns_Validation_Error_For_Missing_Fields [89ms]
-2026-03-20T12:15:16.1345678Z   Error Message:
-2026-03-20T12:15:16.2456789Z    Assert.Equal() Failure
-2026-03-20T12:15:16.3567890Z    Expected: 400
-2026-03-20T12:15:16.4678901Z    Actual:   500
-2026-03-20T12:15:16.5789012Z   Stack Trace:
-2026-03-20T12:15:16.6890123Z      at Acme.Tests.Hearings.CreateHearingTests.Returns_Validation_Error_For_Missing_Fields() in CreateHearingTests.cs:line 52
-2026-03-20T12:15:20.7901234Z
-2026-03-20T12:15:20.8012345Z Failed!  - Failed:     2, Passed:    50, Skipped:     0, Total:    52, Duration: 10.567 s
+Starting test execution, please wait...
+A total of 3 test files matched the specified pattern.
+  Passed Acme.Tests.Auth.LoginTests.Successful_Login [22ms]
+  Passed Acme.Tests.Auth.LoginTests.Invalid_Password_Returns_401 [8ms]
+  Failed Acme.Tests.Hearings.CreateHearingTests.Chambersadmin_Can_Create_Hearing [156ms]
+  Error Message:
+   System.Net.Http.HttpRequestException: Response status code does not indicate success: 403 (Forbidden).
+  Stack Trace:
+     at Acme.Tests.Helpers.ApiClient.PostAsync() in ApiClient.cs:line 45
+     at Acme.Tests.Hearings.CreateHearingTests.Chambersadmin_Can_Create_Hearing() in CreateHearingTests.cs:line 28
+  Failed Acme.Tests.Hearings.CreateHearingTests.Returns_Validation_Error_For_Missing_Fields [89ms]
+  Error Message:
+   Assert.Equal() Failure
+   Expected: 400
+   Actual:   500
+  Stack Trace:
+     at Acme.Tests.Hearings.CreateHearingTests.Returns_Validation_Error_For_Missing_Fields() in CreateHearingTests.cs:line 52
+
+Failed!  - Failed:     2, Passed:    50, Skipped:     0, Total:    52, Duration: 10.567 s

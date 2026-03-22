@@ -34,8 +34,9 @@ Global `--json` flag on root command switches output format.
 **`internal/runner/`** — GitHub Actions log fetching and parsing
 - `GHExecutor` interface abstracts `gh` CLI calls (stubbed in tests via package-level `Executor` variable)
 - `FetchLogs()` fetches concurrently using `errgroup` with configurable concurrency
+- All log paths strip GitHub Actions `job\tstep\t` tab prefixes and ISO 8601 timestamps via `stripLogPrefixes()`
 - `GetFailedSteps()` parses job/step JSON to isolate failed step logs
-- `ExtractValues()` applies regex with named capture groups to extract numeric values
+- `ExtractValues()` applies regex with named capture groups to extract numeric values; supports optional `(?P<label>...)` group for row-level context
 
 **`internal/parser/`** — Framework-specific test failure parsers
 - `FrameworkParser` interface: `Name()`, `Detect(logs)`, `Extract(logs)`

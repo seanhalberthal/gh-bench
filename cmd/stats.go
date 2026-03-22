@@ -86,13 +86,13 @@ func runStats(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("fetching logs: %w", err)
 	}
 
-	re, groupIdx, err := runner.CompilePattern(pattern)
+	re, groupIdx, labelIdx, err := runner.CompilePattern(pattern)
 	if err != nil {
 		return err
 	}
 
 	matchAll := matchFlag == "all"
-	values, err := runner.ExtractValues(results, re, groupIdx, matchAll)
+	values, err := runner.ExtractValues(results, re, groupIdx, labelIdx, matchAll)
 	if err != nil {
 		return fmt.Errorf("extracting values: %w", err)
 	}
@@ -134,6 +134,7 @@ func parseRunIDs(s string) ([]int64, error) {
 }
 
 func printStatsJSON(values runner.ExtractedValues, aggs map[string]float64) error {
+	hasLabels := values.HasLabels()
 	fmt.Println("{")
 	fmt.Println("  \"runs\": [")
 	for i, v := range values {
@@ -141,7 +142,11 @@ func printStatsJSON(values runner.ExtractedValues, aggs map[string]float64) erro
 		if i == len(values)-1 {
 			comma = ""
 		}
-		fmt.Printf("    {\"run_id\": %d, \"title\": %q, \"value\": %s}%s\n", v.RunID, v.Title, v.Raw, comma)
+		if hasLabels {
+			fmt.Printf("    {\"run_id\": %d, \"label\": %q, \"value\": %s}%s\n", v.RunID, v.Label, v.Raw, comma)
+		} else {
+			fmt.Printf("    {\"run_id\": %d, \"title\": %q, \"value\": %s}%s\n", v.RunID, v.Title, v.Raw, comma)
+		}
 	}
 	fmt.Println("  ],")
 	fmt.Println("  \"aggregations\": {")
@@ -162,17 +167,32 @@ func printStatsJSON(values runner.ExtractedValues, aggs map[string]float64) erro
 }
 
 func printStatsCSV(values runner.ExtractedValues, _ map[string]float64) error {
-	fmt.Println("run_id,title,value")
-	for _, v := range values {
-		fmt.Printf("%d,%q,%s\n", v.RunID, v.Title, v.Raw)
+	if values.HasLabels() {
+		fmt.Println("run_id,label,value")
+		for _, v := range values {
+			fmt.Printf("%d,%q,%s\n", v.RunID, v.Label, v.Raw)
+		}
+	} else {
+		fmt.Println("run_id,title,value")
+		for _, v := range values {
+			fmt.Printf("%d,%q,%s\n", v.RunID, v.Title, v.Raw)
+		}
 	}
 	return nil
 }
 
 func printStatsTable(values runner.ExtractedValues, aggs map[string]float64) error {
-	fmt.Printf("%-15s %-35s %s\n", "RUN ID", "TITLE", "VALUE")
-	for _, v := range values {
-		fmt.Printf("%-15d %-35s %s\n", v.RunID, truncate(v.Title, 35), v.Raw)
+	if values.HasLabels() {
+		labels := stripCommonPrefix(values)
+		fmt.Printf("%-15s %-45s %s\n", "RUN ID", "LABEL", "VALUE")
+		for i, v := range values {
+			fmt.Printf("%-15d %-45s %s\n", v.RunID, truncate(labels[i], 45), v.Raw)
+		}
+	} else {
+		fmt.Printf("%-15s %-35s %s\n", "RUN ID", "TITLE", "VALUE")
+		for _, v := range values {
+			fmt.Printf("%-15d %-35s %s\n", v.RunID, truncate(v.Title, 35), v.Raw)
+		}
 	}
 	fmt.Println(strings.Repeat("─", 60))
 
@@ -182,6 +202,48 @@ func printStatsTable(values runner.ExtractedValues, aggs map[string]float64) err
 	}
 	fmt.Println(strings.Join(parts, "  "))
 	return nil
+}
+
+// stripCommonPrefix removes the longest shared path prefix from labels
+// so the table shows only the distinguishing suffix.
+func stripCommonPrefix(values runner.ExtractedValues) []string {
+	labels := make([]string, len(values))
+	for i, v := range values {
+		labels[i] = v.Label
+	}
+
+	if len(labels) < 2 {
+		return labels
+	}
+
+	// Find the longest common prefix.
+	prefix := labels[0]
+	for _, l := range labels[1:] {
+		for !strings.HasPrefix(l, prefix) {
+			prefix = prefix[:len(prefix)-1]
+			if prefix == "" {
+				return labels
+			}
+		}
+	}
+
+	// Trim to last '/' boundary so we strip whole path segments.
+	if idx := strings.LastIndex(prefix, "/"); idx >= 0 {
+		prefix = prefix[:idx+1]
+	} else {
+		return labels // no path separator — nothing useful to strip
+	}
+
+	// Only strip if it actually shortens things meaningfully.
+	if len(prefix) < 5 {
+		return labels
+	}
+
+	trimmed := make([]string, len(labels))
+	for i, l := range labels {
+		trimmed[i] = strings.TrimPrefix(l, prefix)
+	}
+	return trimmed
 }
 
 func truncate(s string, max int) string {
