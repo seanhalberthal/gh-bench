@@ -299,6 +299,7 @@ func TestPreset_Duration(t *testing.T) {
 		{"Finished in 100ms", 100},
 		{"completed in 7.8s", 7.8},
 		{"Time: 4.589 s", 4.589},
+		{"Time (mean ± σ):      63.1 ms ±  10.4 ms    [User: 32.2 ms, System: 23.9 ms]", 63.1},
 	}
 	re, idx, labelIdx := mustCompile(t, Presets["duration"].Pattern)
 	for _, tc := range cases {
