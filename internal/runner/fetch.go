@@ -14,19 +14,21 @@ import (
 
 // FetchOpts configures log fetching behaviour.
 type FetchOpts struct {
-	Workflow    string
-	RunIDs      []int64
-	Branch      string
-	Limit       int
-	Concurrency int
-	FailedOnly  bool
-	Step        string // Filter logs to a specific step name
+	Workflow     string
+	RunIDs       []int64
+	Branch       string
+	Limit        int
+	Concurrency  int
+	FailedOnly   bool
+	Step         string   // Filter logs to a specific step name
+	ExcludeSteps []string // Exclude steps matching these names (case-insensitive substring)
 }
 
 // fetchRunOpts are per-run options passed to fetchSingleRun.
 type fetchRunOpts struct {
-	FailedOnly bool
-	Step       string
+	FailedOnly   bool
+	Step         string
+	ExcludeSteps []string
 }
 
 // RunResult holds the output for a single workflow run.
@@ -91,7 +93,7 @@ func FetchLogs(ctx context.Context, opts FetchOpts) ([]RunResult, error) {
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(opts.Concurrency)
 
-	runOpts := fetchRunOpts{FailedOnly: opts.FailedOnly, Step: opts.Step}
+	runOpts := fetchRunOpts{FailedOnly: opts.FailedOnly, Step: opts.Step, ExcludeSteps: opts.ExcludeSteps}
 	for i, id := range runIDs {
 		g.Go(func() error {
 			result, err := fetchSingleRun(ctx, id, runOpts)
@@ -172,6 +174,9 @@ func fetchSingleRun(_ context.Context, runID int64, opts fetchRunOpts) (RunResul
 		if err != nil {
 			return result, fmt.Errorf("fetching failed steps: %w", err)
 		}
+		if len(opts.ExcludeSteps) > 0 {
+			steps = filterExcludedSteps(steps, opts.ExcludeSteps)
+		}
 		result.FailedSteps = steps
 	} else if opts.Step != "" {
 		log, err := getStepLog(runID, opts.Step)
@@ -223,4 +228,24 @@ func getStepLog(runID int64, stepName string) (string, error) {
 	}
 
 	return "", fmt.Errorf("step matching %q not found in run %d", stepName, runID)
+}
+
+// filterExcludedSteps removes steps whose names match any of the exclude
+// patterns (case-insensitive substring match).
+func filterExcludedSteps(steps []StepResult, excludes []string) []StepResult {
+	filtered := steps[:0]
+	for _, s := range steps {
+		lower := strings.ToLower(s.Name)
+		excluded := false
+		for _, ex := range excludes {
+			if strings.Contains(lower, strings.ToLower(ex)) {
+				excluded = true
+				break
+			}
+		}
+		if !excluded {
+			filtered = append(filtered, s)
+		}
+	}
+	return filtered
 }

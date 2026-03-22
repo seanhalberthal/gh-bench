@@ -43,6 +43,11 @@ Global `--json` flag on root command switches output format.
 - Each parser uses regex to find failures, then looks backward/forward for error context
 - Test data lives in `internal/parser/testdata/` (real CI log samples)
 
+**`internal/config/`** — Project-level configuration
+- Loads `.gh-bench.yml` from the working directory, walking up to the git root
+- Provides defaults for `workflow` (all commands) and `failures.exclude-steps`
+- CLI flags override config values when explicitly set
+
 **`internal/stats/`** — Statistical aggregation
 - `Compute(values, aggNames)` dispatches to median/mean/p95/min/max
 - Immutable: creates copies before sorting to avoid mutating input
