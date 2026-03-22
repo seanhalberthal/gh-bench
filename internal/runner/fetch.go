@@ -185,12 +185,12 @@ func fetchSingleRun(_ context.Context, runID int64, opts fetchRunOpts) (RunResul
 		}
 		result.Log = log
 	} else {
-		// Get full log
+		// Get full log — strip job\tstep\t prefixes and timestamps.
 		logOut, err := Executor.Run("run", "view", idStr, "--log")
 		if err != nil {
 			return result, fmt.Errorf("fetching log: %w", err)
 		}
-		result.Log = logOut
+		result.Log = stripLogPrefixes(logOut)
 	}
 
 	return result, nil

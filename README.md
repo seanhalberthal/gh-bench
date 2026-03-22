@@ -59,7 +59,7 @@ gh bench stats --runs 111,222,333 --pattern 'score=(?P<val>[0-9.]+)'
 |------|-------|---------|-------------|
 | `--workflow` | `-w` | | Workflow filename or name |
 | `--runs` | `-r` | | Comma-separated list of run IDs |
-| `--pattern` | `-P` | | Regex with a named capture group `(?P<name>...)` |
+| `--pattern` | `-P` | | Regex with a named capture group `(?P<name>...)`. Optionally include `(?P<label>...)` for row context |
 | `--preset` | `-p` | | Use a built-in pattern preset (see `--list-presets`) |
 | `--list-presets` | `-L` | | List available pattern presets and exit |
 | `--limit` | `-l` | `10` | Max number of runs to fetch |
@@ -128,6 +128,25 @@ RUN ID          TITLE                           VALUE
 ────────────────────────────────────────────────────────────────────
 median: 91.0  p95: 103.2
 ```
+
+### Per-package Go test durations
+
+Using `--match all` with the `go-test` preset extracts every package duration and labels each row with the package name:
+
+```bash
+$ gh bench stats --preset go-test --workflow ci.yml --match all --limit 1
+
+RUN ID          LABEL                                         VALUE
+23402873321     audit                                         1.057
+23402873321     cli                                           1.073
+23402873321     lockfile                                      1.027
+23402873321     scanner                                       166.842
+23402873321     server                                        1.031
+────────────────────────────────────────────────────────────
+median: 1.1
+```
+
+Labels come from the `(?P<label>...)` capture group in the pattern. When labels share a common path prefix, the table automatically strips it for readability. Full paths are preserved in `--format json` and `--format csv` output.
 
 ### Extracting .NET test failures
 

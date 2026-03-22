@@ -176,6 +176,70 @@ func TestStripLogPrefixes(t *testing.T) {
 	}
 }
 
+func TestStripTimestamp(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			"standard timestamp",
+			"2026-03-16T13:34:37.3465175Z ok  \tgithub.com/foo/bar\t1.234s",
+			"ok  \tgithub.com/foo/bar\t1.234s",
+		},
+		{
+			"short fractional seconds",
+			"2026-03-16T13:34:37.3Z some output",
+			"some output",
+		},
+		{
+			"no timestamp",
+			"ok  \tgithub.com/foo/bar\t1.234s",
+			"ok  \tgithub.com/foo/bar\t1.234s",
+		},
+		{
+			"empty line",
+			"",
+			"",
+		},
+		{
+			"too short",
+			"2026-03",
+			"2026-03",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := stripTimestamp(tt.input)
+			if got != tt.want {
+				t.Errorf("stripTimestamp(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestStripTimestamps(t *testing.T) {
+	input := "2026-03-16T13:34:37.3465175Z line one\n2026-03-16T13:34:37.3558618Z line two\nno timestamp"
+	got := stripTimestamps(input)
+	want := "line one\nline two\nno timestamp"
+	if got != want {
+		t.Errorf("stripTimestamps() = %q, want %q", got, want)
+	}
+}
+
+func TestStripLogPrefixes_WithTimestamps(t *testing.T) {
+	// Real-world GitHub Actions log format: job\tstep\ttimestamp content
+	input := "test\tRun tests\t2026-03-16T13:34:37.3465175Z ok  \tgithub.com/foo/bar\t1.234s\n" +
+		"test\tRun tests\t2026-03-16T13:34:37.3558618Z ok  \tgithub.com/foo/baz\t0.567s\n" +
+		"no tabs here"
+	got := stripLogPrefixes(input)
+	want := "ok  \tgithub.com/foo/bar\t1.234s\nok  \tgithub.com/foo/baz\t0.567s\nno tabs here"
+	if got != want {
+		t.Errorf("stripLogPrefixes() = %q, want %q", got, want)
+	}
+}
+
 func TestShouldSkipStep(t *testing.T) {
 	tests := []struct {
 		name string
