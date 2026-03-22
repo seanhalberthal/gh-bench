@@ -81,8 +81,13 @@ func runStats(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("fetching logs: %w", err)
 	}
 
+	re, groupIdx, err := runner.CompilePattern(pattern)
+	if err != nil {
+		return err
+	}
+
 	matchAll := matchFlag == "all"
-	values, err := runner.ExtractValues(results, pattern, matchAll)
+	values, err := runner.ExtractValues(results, re, groupIdx, matchAll)
 	if err != nil {
 		return fmt.Errorf("extracting values: %w", err)
 	}
