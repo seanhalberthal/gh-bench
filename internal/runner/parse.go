@@ -18,8 +18,8 @@ type Preset struct {
 // Presets maps preset names to their definitions.
 var Presets = map[string]Preset{
 	"duration": {
-		Pattern:     `(?i)(?:took|duration|time|elapsed|finished in|completed in)\s*[:=]?\s*(?P<duration>[0-9.]+)\s*(?:ms|s)\b`,
-		Description: "Common duration/timing output",
+		Pattern:     `(?i)(?:took|duration|time|elapsed|finished in|completed in)\s*(?:\([^)]*\))?\s*[:=]?\s*(?P<duration>[0-9.]+)\s*(?:ms|s)\b`,
+		Description: "Common duration/timing output (incl. hyperfine)",
 		Example:     "Took 12.5s, duration: 45ms, elapsed: 3.2s",
 	},
 	"coverage": {
