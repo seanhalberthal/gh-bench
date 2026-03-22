@@ -2,7 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"time"
 
+	"github.com/briandowns/spinner"
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 )
 
@@ -38,6 +42,18 @@ func resolveFormat(cmd *cobra.Command) string {
 		return "json"
 	}
 	return format
+}
+
+// startSpinner creates and starts a stderr spinner if stderr is a terminal.
+// Returns a stop function that is always safe to call.
+func startSpinner(suffix string) func() {
+	if !isatty.IsTerminal(os.Stderr.Fd()) && !isatty.IsCygwinTerminal(os.Stderr.Fd()) {
+		return func() {}
+	}
+	s := spinner.New(spinner.CharSets[14], 100*time.Millisecond, spinner.WithWriter(os.Stderr))
+	s.Suffix = " " + suffix
+	s.Start()
+	return func() { s.Stop() }
 }
 
 // Execute runs the root command.
