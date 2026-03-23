@@ -12,6 +12,12 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// RunInfo holds the ID and branch for a workflow run, returned by ListRuns.
+type RunInfo struct {
+	ID     int64
+	Branch string
+}
+
 // FetchOpts configures log fetching behaviour.
 type FetchOpts struct {
 	Workflow     string
@@ -36,6 +42,7 @@ type RunResult struct {
 	RunID       int64
 	Title       string
 	Date        string
+	Branch      string
 	Log         string
 	FailedSteps []StepResult
 }
@@ -112,7 +119,8 @@ func FetchLogs(ctx context.Context, opts FetchOpts) ([]RunResult, error) {
 	return results, nil
 }
 
-func listRunIDs(opts FetchOpts) ([]int64, error) {
+// ListRuns queries workflow runs and returns their IDs and branch names.
+func ListRuns(opts FetchOpts) ([]RunInfo, error) {
 	args := []string{"run", "list", "--limit", strconv.Itoa(opts.Limit)}
 
 	if opts.Workflow != "" {
@@ -124,24 +132,41 @@ func listRunIDs(opts FetchOpts) ([]int64, error) {
 	if opts.FailedOnly {
 		args = append(args, "--status", "failure")
 	}
-	args = append(args, "--json", "databaseId", "--jq", ".[].databaseId")
+	args = append(args, "--json", "databaseId,headBranch")
 
 	out, err := Executor.Run(args...)
 	if err != nil {
 		return nil, err
 	}
 
-	var ids []int64
-	for line := range strings.SplitSeq(strings.TrimSpace(out), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		id, err := strconv.ParseInt(line, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("parsing run ID %q: %w", line, err)
-		}
-		ids = append(ids, id)
+	out = strings.TrimSpace(out)
+	if out == "" || out == "[]" {
+		return nil, nil
+	}
+
+	var raw []struct {
+		DatabaseID int64  `json:"databaseId"`
+		HeadBranch string `json:"headBranch"`
+	}
+	if err := json.Unmarshal([]byte(out), &raw); err != nil {
+		return nil, fmt.Errorf("parsing run list JSON: %w", err)
+	}
+
+	runs := make([]RunInfo, len(raw))
+	for i, r := range raw {
+		runs[i] = RunInfo{ID: r.DatabaseID, Branch: r.HeadBranch}
+	}
+	return runs, nil
+}
+
+func listRunIDs(opts FetchOpts) ([]int64, error) {
+	runs, err := ListRuns(opts)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]int64, len(runs))
+	for i, r := range runs {
+		ids[i] = r.ID
 	}
 	return ids, nil
 }
@@ -150,22 +175,27 @@ func fetchSingleRun(_ context.Context, runID int64, opts fetchRunOpts) (RunResul
 	idStr := strconv.FormatInt(runID, 10)
 
 	// Get run metadata
-	metaOut, err := Executor.Run("run", "view", idStr, "--json", "displayTitle,createdAt", "--jq", ".displayTitle + \"\\t\" + .createdAt")
+	metaOut, err := Executor.Run("run", "view", idStr, "--json", "displayTitle,createdAt,headBranch", "--jq", ".displayTitle + \"\\t\" + .createdAt + \"\\t\" + .headBranch")
 	if err != nil {
 		return RunResult{}, fmt.Errorf("fetching metadata: %w", err)
 	}
 
-	parts := strings.SplitN(strings.TrimSpace(metaOut), "\t", 2)
+	parts := strings.SplitN(strings.TrimSpace(metaOut), "\t", 3)
 	title := parts[0]
 	date := ""
 	if len(parts) > 1 {
 		date = parts[1]
 	}
+	branch := ""
+	if len(parts) > 2 {
+		branch = parts[2]
+	}
 
 	result := RunResult{
-		RunID: runID,
-		Title: title,
-		Date:  date,
+		RunID:  runID,
+		Title:  title,
+		Date:   date,
+		Branch: branch,
 	}
 
 	if opts.FailedOnly {

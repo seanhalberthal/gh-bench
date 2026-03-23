@@ -60,7 +60,7 @@ func TestFetchLogs_WithRunIDs(t *testing.T) {
 
 func TestFetchLogs_EmptyRunIDs(t *testing.T) {
 	stub := newStubExecutor()
-	stub.handlers["run list"] = ""
+	stub.handlers["run list"] = "[]"
 
 	orig := Executor
 	Executor = stub
@@ -100,7 +100,7 @@ func TestFetchLogs_DefaultConcurrency(t *testing.T) {
 
 func TestListRunIDs_WithWorkflowAndBranch(t *testing.T) {
 	stub := newStubExecutor()
-	stub.handlers["run list"] = "111\n222\n333\n"
+	stub.handlers["run list"] = `[{"databaseId":111,"headBranch":"feat-a"},{"databaseId":222,"headBranch":"feat-b"},{"databaseId":333,"headBranch":"main"}]`
 
 	orig := Executor
 	Executor = stub
@@ -133,7 +133,7 @@ func TestListRunIDs_WithWorkflowAndBranch(t *testing.T) {
 
 func TestListRunIDs_FailedOnly(t *testing.T) {
 	stub := newStubExecutor()
-	stub.handlers["run list"] = "111\n"
+	stub.handlers["run list"] = `[{"databaseId":111,"headBranch":"main"}]`
 
 	orig := Executor
 	Executor = stub
@@ -156,7 +156,7 @@ func TestListRunIDs_FailedOnly(t *testing.T) {
 
 func TestListRunIDs_EmptyOutput(t *testing.T) {
 	stub := newStubExecutor()
-	stub.handlers["run list"] = ""
+	stub.handlers["run list"] = "[]"
 
 	orig := Executor
 	Executor = stub
@@ -168,6 +168,46 @@ func TestListRunIDs_EmptyOutput(t *testing.T) {
 	}
 	if len(ids) != 0 {
 		t.Fatalf("expected 0 IDs, got %d", len(ids))
+	}
+}
+
+func TestListRuns_ReturnsBranchInfo(t *testing.T) {
+	stub := newStubExecutor()
+	stub.handlers["run list"] = `[{"databaseId":100,"headBranch":"feature-x"},{"databaseId":200,"headBranch":"fix-y"}]`
+
+	orig := Executor
+	Executor = stub
+	defer func() { Executor = orig }()
+
+	runs, err := ListRuns(FetchOpts{Workflow: "ci.yml", Limit: 5})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(runs) != 2 {
+		t.Fatalf("expected 2 runs, got %d", len(runs))
+	}
+	if runs[0].ID != 100 || runs[0].Branch != "feature-x" {
+		t.Errorf("run[0] = {%d, %q}, want {100, \"feature-x\"}", runs[0].ID, runs[0].Branch)
+	}
+	if runs[1].ID != 200 || runs[1].Branch != "fix-y" {
+		t.Errorf("run[1] = {%d, %q}, want {200, \"fix-y\"}", runs[1].ID, runs[1].Branch)
+	}
+}
+
+func TestListRuns_Empty(t *testing.T) {
+	stub := newStubExecutor()
+	stub.handlers["run list"] = "[]"
+
+	orig := Executor
+	Executor = stub
+	defer func() { Executor = orig }()
+
+	runs, err := ListRuns(FetchOpts{Limit: 5})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(runs) != 0 {
+		t.Fatalf("expected 0 runs, got %d", len(runs))
 	}
 }
 
@@ -210,9 +250,9 @@ func TestFilterExcludedSteps(t *testing.T) {
 	}
 }
 
-func TestListRunIDs_InvalidID(t *testing.T) {
+func TestListRunIDs_InvalidJSON(t *testing.T) {
 	stub := newStubExecutor()
-	stub.handlers["run list"] = "abc\n"
+	stub.handlers["run list"] = "not json"
 
 	orig := Executor
 	Executor = stub
@@ -220,6 +260,6 @@ func TestListRunIDs_InvalidID(t *testing.T) {
 
 	_, err := listRunIDs(FetchOpts{Limit: 10})
 	if err == nil {
-		t.Fatal("expected error for invalid ID")
+		t.Fatal("expected error for invalid JSON")
 	}
 }

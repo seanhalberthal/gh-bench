@@ -76,8 +76,11 @@ Either `--pattern` or `--preset` is required. Either `--workflow` or `--runs` is
 
 Fetch failed CI runs, identify failing steps, and extract structured errors using framework-aware parsers.
 
+By default, only runs from branches with **open pull requests** are shown — keeping the output focused on actionable failures. Use `--all` to include all failed runs, or `--branch` to target a specific branch.
+
 ```bash
 gh bench failures --workflow ci.yml
+gh bench failures -w ci.yml --all
 gh bench failures -r 12345678
 gh bench failures -w ci.yml -b main -l 10
 gh bench failures --runs 12345678 --format json
@@ -89,7 +92,8 @@ gh bench failures -w ci.yml --group
 | `--workflow` | `-w` | | Workflow filename or name |
 | `--runs` | `-r` | | Comma-separated list of run IDs |
 | `--limit` | `-l` | `5` | Max failed runs to fetch |
-| `--branch` | `-b` | | Filter by branch |
+| `--branch` | `-b` | | Filter by branch (disables open-PR filtering) |
+| `--all` | `-a` | `false` | Include all failed runs, not just those with open PRs |
 | `--group` | `-g` | `false` | Group identical failures across runs |
 | `--exclude-step` | `-x` | | Exclude steps matching name (case-insensitive substring, repeatable) |
 | `--concurrency` | `-c` | `5` | Concurrent log fetchers |
