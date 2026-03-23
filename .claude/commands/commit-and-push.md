@@ -116,7 +116,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 Stage the CHANGELOG changes.
 
-### 6. Stage and Commit
+### 6. Determine Branch Strategy
+
+**Before staging or committing**, determine whether this change should go on a feature branch:
+
+- **`docs:` and `chore:` commits**: May be committed directly on main
+- **All other prefixes** (`feat:`, `fix:`, `add:`, `update:`, `breaking:`, `refactor:`, `test:`): **MUST be on a feature branch** — create one now before committing
+
+```bash
+# For non-trivial changes — create branch BEFORE committing
+git checkout -b <branch-name>
+```
+
+Use a descriptive branch name (e.g. `feat/open-pr-filtering`, `fix/parse-error`).
+
+### 7. Stage and Commit
 
 Stage all relevant files by name (do NOT use `git add -A` or `git add .`):
 
@@ -147,17 +161,15 @@ Version bump reference (for choosing the right prefix):
 - `feat:` / `fix:` → patch (0.0.x)
 - `docs:` / `chore:` / `refactor:` / `test:` → no release
 
-### 7. Push
-
-**Non-trivial changes MUST go through a pull request.** Only `docs:` and `chore:` commits may be pushed directly to main. For all other prefixes (`feat:`, `fix:`, `add:`, `update:`, `breaking:`, `refactor:`, `test:`), create a new branch and open a PR instead of pushing directly:
+### 8. Push and PR
 
 ```bash
-# For docs:/chore: — push directly
 git push -u origin HEAD
+```
 
-# For all other prefixes — branch and PR
-git checkout -b <branch-name>
-git push -u origin HEAD
+If on a feature branch (non-`docs:`/`chore:` changes), open a pull request:
+
+```bash
 gh pr create --title "prefix: description" --body "$(cat <<'EOF'
 ## Summary
 - Description of changes
@@ -165,8 +177,8 @@ EOF
 )"
 ```
 
-### 8. Verify
+### 9. Verify
 
 Run `git status` to confirm a clean working tree and successful push.
 
-Report the commit hash and any version bump that will be triggered by the commit prefix.
+Report the commit hash, PR URL (if applicable), and any version bump that will be triggered by the commit prefix.

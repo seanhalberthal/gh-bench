@@ -7,6 +7,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- `failures` command now filters to runs with open PRs by default, keeping output focused on actionable failures
+- `--all` / `-a` flag on `failures` to include all failed runs (previous behaviour)
+- Branch name shown in `failures` output (text, JSON, CSV)
+
+### Changed
+- `failures` display order reversed — most recent failures now appear at the bottom (closest to cursor)
+
+## [0.1.6]
+
+### Added
 - Optional `(?P<label>...)` capture group in patterns for row-level context (e.g. package names in `go-test` output)
 - Common path prefix stripping in table output for readable labels
 

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/seanhalberthal/gh-bench/internal/parser"
@@ -26,6 +27,7 @@ func init() {
 	failuresCmd.Flags().IntP("concurrency", "c", 5, "Number of concurrent log fetchers")
 	failuresCmd.Flags().BoolP("group", "g", false, "Group identical failures across runs")
 	failuresCmd.Flags().StringSliceP("exclude-step", "x", nil, "Exclude steps matching these names (case-insensitive substring, repeatable)")
+	failuresCmd.Flags().BoolP("all", "a", false, "Include all failed runs, not just those with open PRs")
 }
 
 // enrichedStep holds a step result with pre-parsed failure data.
@@ -49,6 +51,7 @@ func runFailures(cmd *cobra.Command, args []string) error {
 	concurrency, _ := cmd.Flags().GetInt("concurrency")
 	groupFlag, _ := cmd.Flags().GetBool("group")
 	excludeSteps, _ := cmd.Flags().GetStringSlice("exclude-step")
+	allFlag, _ := cmd.Flags().GetBool("all")
 
 	// Apply config defaults when flags aren't explicitly set.
 	if workflow == "" && cfg.Workflow != "" {
@@ -79,6 +82,18 @@ func runFailures(cmd *cobra.Command, args []string) error {
 		opts.RunIDs = ids
 	}
 
+	// By default, filter to runs with open PRs unless --all, --branch, or --runs is set.
+	activeFilter := !allFlag && !cmd.Flags().Changed("branch") && runsFlag == ""
+	if activeFilter {
+		filtered, err := withSpinner("Checking open PRs…", func() ([]int64, error) {
+			return filterByOpenPRs(opts)
+		})
+		if err != nil {
+			return fmt.Errorf("filtering by open PRs: %w", err)
+		}
+		opts.RunIDs = filtered
+	}
+
 	results, err := withSpinner("Fetching failed run logs…", func() ([]runner.RunResult, error) {
 		return runner.FetchLogs(cmd.Context(), opts)
 	})
@@ -93,6 +108,9 @@ func runFailures(cmd *cobra.Command, args []string) error {
 		}
 		if branch != "" {
 			fmt.Fprintf(os.Stderr, " on branch %q", branch)
+		}
+		if activeFilter {
+			fmt.Fprintf(os.Stderr, " with open PRs (use --all to include all failed runs)")
 		}
 		fmt.Fprintln(os.Stderr)
 		return nil
@@ -122,6 +140,9 @@ func runFailures(cmd *cobra.Command, args []string) error {
 	if totalFailures == 0 {
 		fmt.Fprintf(os.Stderr, "warning: %d failed runs found but no structured failures extracted (framework not detected?)\n", len(results))
 	}
+
+	// Reverse so the most recent failures appear at the bottom (closest to cursor).
+	slices.Reverse(enriched)
 
 	if groupFlag {
 		runFailures := make(map[int64][]parser.Failure)
@@ -154,6 +175,7 @@ func printFailuresJSON(enriched []enrichedRun) error {
 		RunID     int64            `json:"run_id"`
 		Title     string           `json:"title"`
 		Date      string           `json:"date"`
+		Branch    string           `json:"branch"`
 		Step      string           `json:"step"`
 		Framework string           `json:"framework"`
 		Failures  []parser.Failure `json:"failures"`
@@ -166,6 +188,7 @@ func printFailuresJSON(enriched []enrichedRun) error {
 				RunID:     r.RunID,
 				Title:     r.Title,
 				Date:      r.Date,
+				Branch:    r.Branch,
 				Step:      step.Name,
 				Framework: step.Framework,
 				Failures:  step.Failures,
@@ -182,12 +205,12 @@ func printFailuresJSON(enriched []enrichedRun) error {
 }
 
 func printFailuresCSV(enriched []enrichedRun) error {
-	fmt.Println("run_id,title,date,step,framework,test_name,message,location")
+	fmt.Println("run_id,title,date,branch,step,framework,test_name,message,location")
 	for _, r := range enriched {
 		for _, step := range r.Steps {
 			for _, f := range step.Failures {
-				fmt.Printf("%d,%q,%q,%q,%q,%q,%q,%q\n",
-					r.RunID, r.Title, r.Date, step.Name,
+				fmt.Printf("%d,%q,%q,%q,%q,%q,%q,%q,%q\n",
+					r.RunID, r.Title, r.Date, r.Branch, step.Name,
 					step.Framework, f.TestName, f.Message, f.Location)
 			}
 		}
@@ -204,7 +227,11 @@ func printFailuresText(enriched []enrichedRun) error {
 			b.WriteByte('\n')
 		}
 		for _, step := range r.Steps {
-			fmt.Fprintf(&b, "● RUN %d — %s (%s)\n", r.RunID, r.Title, r.Date)
+			if r.Branch != "" {
+				fmt.Fprintf(&b, "● RUN %d — %s (%s) [%s]\n", r.RunID, r.Title, r.Date, r.Branch)
+			} else {
+				fmt.Fprintf(&b, "● RUN %d — %s (%s)\n", r.RunID, r.Title, r.Date)
+			}
 			fmt.Fprintf(&b, "  Step: %s\n", step.Name)
 			fmt.Fprintf(&b, "  Framework: %s\n\n", step.Framework)
 
@@ -277,4 +304,29 @@ func printGroupedJSON(groups []parser.FailureGroup, totalRuns int) error {
 	}
 	fmt.Println(string(data))
 	return nil
+}
+
+// filterByOpenPRs lists failed runs, fetches open PR branches, and returns
+// only the run IDs whose branch has an open PR.
+func filterByOpenPRs(opts runner.FetchOpts) ([]int64, error) {
+	runs, err := runner.ListRuns(opts)
+	if err != nil {
+		return nil, fmt.Errorf("listing runs: %w", err)
+	}
+	if len(runs) == 0 {
+		return nil, nil
+	}
+
+	openBranches, err := runner.ListOpenPRBranches()
+	if err != nil {
+		return nil, fmt.Errorf("listing open PRs: %w", err)
+	}
+
+	var ids []int64
+	for _, r := range runs {
+		if openBranches[r.Branch] {
+			ids = append(ids, r.ID)
+		}
+	}
+	return ids, nil
 }
