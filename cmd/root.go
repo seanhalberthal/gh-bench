@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/charmbracelet/lipgloss"
@@ -51,9 +52,22 @@ func resolveFormat(cmd *cobra.Command) string {
 	return format
 }
 
+// stderrIsTTY reports whether stderr is an interactive terminal.
+func stderrIsTTY() bool {
+	fi, err := os.Stderr.Stat()
+	if err != nil {
+		return false
+	}
+	return fi.Mode()&os.ModeCharDevice != 0
+}
+
 // withSpinner runs fn while displaying a terminal spinner with the given title.
 // The spinner renders to stderr so it doesn't interfere with command output.
+// In non-TTY environments the spinner is suppressed to avoid polluting captured output.
 func withSpinner[T any](title string, fn func() (T, error)) (T, error) {
+	if !stderrIsTTY() {
+		return fn()
+	}
 	var result T
 	var fnErr error
 	style := lipgloss.NewStyle().Foreground(lipgloss.Color("6"))

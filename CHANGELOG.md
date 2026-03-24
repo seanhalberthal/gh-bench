@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed
+- `failures` command no longer treats cancelled steps as failures — only steps with a `failure` conclusion are reported
+- Runs where every step was cancelled are now silently dropped instead of appearing as empty failures
+- Spinner suppressed in non-TTY environments to avoid polluting captured output
+
+## [0.1.7]
+
 ### Added
 - `failures` command now filters to runs with open PRs by default, keeping output focused on actionable failures
 - `--all` / `-a` flag on `failures` to include all failed runs (previous behaviour)
