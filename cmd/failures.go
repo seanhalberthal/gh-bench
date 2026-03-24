@@ -137,8 +137,18 @@ func runFailures(cmd *cobra.Command, args []string) error {
 		enriched[ri] = er
 	}
 
+	// Drop runs where every step was cancelled (no failure conclusion found).
+	enriched = slices.DeleteFunc(enriched, func(er enrichedRun) bool {
+		return len(er.Steps) == 0
+	})
+
+	if len(enriched) == 0 {
+		fmt.Fprintf(os.Stderr, "warning: no failed runs found (all runs may have been cancelled)\n")
+		return nil
+	}
+
 	if totalFailures == 0 {
-		fmt.Fprintf(os.Stderr, "warning: %d failed runs found but no structured failures extracted (framework not detected?)\n", len(results))
+		fmt.Fprintf(os.Stderr, "warning: %d failed runs found but no structured failures extracted (framework not detected?)\n", len(enriched))
 	}
 
 	// Reverse so the most recent failures appear at the bottom (closest to cursor).

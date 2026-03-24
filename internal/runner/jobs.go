@@ -76,7 +76,7 @@ func GetFailedSteps(runID int64) ([]StepResult, error) {
 		}
 		var failed []Step
 		for _, step := range job.Steps {
-			if step.Conclusion != "failure" && step.Conclusion != "cancelled" {
+			if step.Conclusion != "failure" {
 				continue
 			}
 			if shouldSkipStep(step.Name) {
