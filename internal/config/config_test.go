@@ -93,6 +93,60 @@ func TestReadFile_WorkflowOnly(t *testing.T) {
 	}
 }
 
+func TestLoad_ConfigPresent(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, Filename), []byte("workflow: ci.yml\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Chdir(dir)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Workflow != "ci.yml" {
+		t.Errorf("Workflow = %q, want %q", cfg.Workflow, "ci.yml")
+	}
+}
+
+func TestLoad_ConfigAbsent(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Chdir(dir)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("expected no error when config absent, got: %v", err)
+	}
+	if cfg.Workflow != "" {
+		t.Errorf("expected zero Config, got workflow=%q", cfg.Workflow)
+	}
+}
+
+func TestLoad_InvalidYAML(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, Filename), []byte(":\n\t:::bad"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Chdir(dir)
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("expected error for invalid YAML")
+	}
+}
+
 func TestFind_InCurrentDir(t *testing.T) {
 	dir := t.TempDir()
 

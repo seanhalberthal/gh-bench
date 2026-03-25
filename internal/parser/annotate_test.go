@@ -1,6 +1,10 @@
 package parser
 
-import "testing"
+import (
+	"fmt"
+	"strings"
+	"testing"
+)
 
 func TestExtractTimestamp(t *testing.T) {
 	tests := []struct {
@@ -151,4 +155,40 @@ func TestAnnotateTimestamps_NoTimestampInRawLog(t *testing.T) {
 	if failures[0].Timestamp != "" {
 		t.Errorf("expected empty timestamp when raw log has no timestamps, got %q", failures[0].Timestamp)
 	}
+}
+
+func TestAnnotateTimestamps_Vitest_RoundTrip(t *testing.T) {
+	// Simulate the full pipeline: Parse() produces failures with Framework: "Vitest",
+	// then AnnotateTimestamps matches them against a raw log with timestamps.
+	cleanLog := readTestData(t, "vitest.txt")
+	failures := Parse(cleanLog)
+	if len(failures) == 0 {
+		t.Fatal("expected at least one failure from vitest testdata")
+	}
+	if failures[0].Framework != "Vitest" {
+		t.Fatalf("expected framework %q, got %q", "Vitest", failures[0].Framework)
+	}
+
+	// Construct a raw log by prefixing each line with a timestamp.
+	var rawLog string
+	for i, line := range splitLines(cleanLog) {
+		ts := "2026-03-20T15:30:" + fmt.Sprintf("%02d", i) + ".1234567Z "
+		rawLog += ts + line + "\n"
+	}
+
+	AnnotateTimestamps(failures, rawLog)
+
+	for i, f := range failures {
+		if f.Timestamp == "" {
+			t.Errorf("failures[%d] (%q) has empty timestamp after round-trip annotation", i, f.TestName)
+		}
+	}
+}
+
+func splitLines(s string) []string {
+	var lines []string
+	for _, l := range strings.Split(s, "\n") {
+		lines = append(lines, l)
+	}
+	return lines
 }
