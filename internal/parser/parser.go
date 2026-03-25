@@ -27,6 +27,7 @@ type Failure struct {
 	Location  string `json:"location,omitempty"`
 	Duration  string `json:"duration,omitempty"`
 	Framework string `json:"framework"`
+	Timestamp string `json:"timestamp,omitempty"`
 }
 
 // FrameworkParser detects and extracts failures from CI logs.
