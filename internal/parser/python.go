@@ -3,6 +3,8 @@ package parser
 import (
 	"regexp"
 	"strings"
+
+	"github.com/seanhalberthal/gh-bench/internal/logutil"
 )
 
 // PythonParser detects and extracts failures from pytest output.
@@ -62,7 +64,7 @@ func (p *PythonParser) Extract(logs string) []Failure {
 	// Strategy 2: parse detailed failure sections for error messages.
 	// Look for "_____ test_name _____" section headers and extract context.
 	for i, line := range lines {
-		line = stripTimestamp(line)
+		line = logutil.StripTimestamp(line)
 		m := pytestSectionRe.FindStringSubmatch(line)
 		if m == nil {
 			continue
@@ -107,7 +109,7 @@ func (p *PythonParser) extractSectionContext(lines []string, idx int) (string, s
 	limit := min(idx+30, len(lines))
 
 	for i := idx + 1; i < limit; i++ {
-		line := stripTimestamp(strings.TrimSpace(lines[i]))
+		line := logutil.StripTimestamp(strings.TrimSpace(lines[i]))
 		if line == "" {
 			continue
 		}

@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/seanhalberthal/gh-bench/internal/logutil"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -110,19 +110,64 @@ func GetFailedSteps(ctx context.Context, runID int64) ([]StepResult, error) {
 		return nil, err
 	}
 
-	// Assemble step results.
+	// Assemble step results, segmenting logs by step when markers are present.
 	var failedSteps []StepResult
 	for i, js := range toFetch {
 		for _, step := range js.steps {
+			clean := segmentByStep(logs[i].clean, step.Name)
+			raw := segmentByStep(logs[i].raw, step.Name)
 			failedSteps = append(failedSteps, StepResult{
 				Name:   step.Name,
-				Log:    logs[i].clean,
-				RawLog: logs[i].raw,
+				Log:    clean,
+				RawLog: raw,
 			})
 		}
 	}
 
 	return failedSteps, nil
+}
+
+// segmentByStep extracts the log section for a specific step using
+// GitHub Actions ##[group] / ##[endgroup] markers. Falls back to
+// the full log when no matching markers are found.
+func segmentByStep(log, stepName string) string {
+	groupPrefix := "##[group]"
+	endGroup := "##[endgroup]"
+
+	lower := strings.ToLower(stepName)
+	var capturing bool
+	var b strings.Builder
+
+	for line := range strings.SplitSeq(log, "\n") {
+		if strings.HasPrefix(line, groupPrefix) {
+			label := line[len(groupPrefix):]
+			if strings.ToLower(strings.TrimSpace(label)) == lower {
+				capturing = true
+				continue
+			} else if capturing {
+				// Entered a different step's group — stop capturing.
+				break
+			}
+			continue
+		}
+		if line == endGroup {
+			if capturing {
+				break
+			}
+			continue
+		}
+		if capturing {
+			if b.Len() > 0 {
+				b.WriteByte('\n')
+			}
+			b.WriteString(line)
+		}
+	}
+
+	if b.Len() == 0 {
+		return log // no markers found — fall back to full log
+	}
+	return b.String()
 }
 
 // logPair holds both the cleaned log (for parsers) and raw log (timestamps preserved).
@@ -138,7 +183,7 @@ func fetchJobLog(_ context.Context, jobID, runID int64) (logPair, error) {
 	// Returns plain text — no tab-prefixed formatting, but still has timestamps.
 	log, err := Executor.Run("api", "repos/{owner}/{repo}/actions/jobs/"+strconv.FormatInt(jobID, 10)+"/logs")
 	if err == nil {
-		return logPair{clean: stripTimestamps(log), raw: log}, nil
+		return logPair{clean: logutil.StripTimestamps(log), raw: log}, nil
 	}
 
 	// Fallback: gh run view --log --job (slower, adds job\tstep\t prefixes).
@@ -152,32 +197,6 @@ func fetchJobLog(_ context.Context, jobID, runID int64) (logPair, error) {
 	return logPair{clean: stripLogPrefixes(log), raw: stripTabPrefixesOnly(log)}, nil
 }
 
-// timestampRe matches the GitHub Actions log timestamp prefix.
-// Format: 2026-03-16T13:34:37.3465175Z (ISO 8601 with fractional seconds).
-var timestampRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z `)
-
-// stripTimestamp removes a GitHub Actions timestamp prefix from a single line.
-func stripTimestamp(line string) string {
-	if loc := timestampRe.FindStringIndex(line); loc != nil {
-		return line[loc[1]:]
-	}
-	return line
-}
-
-// stripTimestamps removes GitHub Actions timestamp prefixes from all lines.
-func stripTimestamps(log string) string {
-	var b strings.Builder
-	b.Grow(len(log))
-
-	for line := range strings.SplitSeq(log, "\n") {
-		if b.Len() > 0 {
-			b.WriteByte('\n')
-		}
-		b.WriteString(stripTimestamp(line))
-	}
-
-	return b.String()
-}
 
 // stripLogPrefixes removes job\tstep\t prefixes and GitHub Actions timestamps
 // from gh run view --log output.
@@ -192,16 +211,16 @@ func stripLogPrefixes(log string) string {
 
 		first := strings.IndexByte(line, '\t')
 		if first < 0 {
-			b.WriteString(stripTimestamp(line))
+			b.WriteString(logutil.StripTimestamp(line))
 			continue
 		}
 		rest := line[first+1:]
 		second := strings.IndexByte(rest, '\t')
 		if second < 0 {
-			b.WriteString(stripTimestamp(line))
+			b.WriteString(logutil.StripTimestamp(line))
 			continue
 		}
-		b.WriteString(stripTimestamp(rest[second+1:]))
+		b.WriteString(logutil.StripTimestamp(rest[second+1:]))
 	}
 
 	return b.String()

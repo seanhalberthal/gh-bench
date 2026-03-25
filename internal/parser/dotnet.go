@@ -3,6 +3,8 @@ package parser
 import (
 	"regexp"
 	"strings"
+
+	"github.com/seanhalberthal/gh-bench/internal/logutil"
 )
 
 // DotnetParser extracts failures from xUnit/NUnit/MSBuild output.
@@ -80,7 +82,7 @@ func (d *DotnetParser) Extract(logs string) []Failure {
 			}
 
 			// Strip GitHub Actions timestamp prefix for detail matching.
-			cleaned := stripTimestamp(line)
+			cleaned := logutil.StripTimestamp(line)
 
 			// Track "Error Message:" / "Stack Trace:" sections.
 			if dotnetErrorMsgRe.MatchString(cleaned) {
@@ -146,7 +148,7 @@ func (d *DotnetParser) extractFromSummary(logs string) []Failure {
 	var errorLines []string
 
 	for _, raw := range lines {
-		line := strings.TrimSpace(stripTimestamp(raw))
+		line := strings.TrimSpace(logutil.StripTimestamp(raw))
 		if line == "" {
 			continue
 		}
