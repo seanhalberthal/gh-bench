@@ -94,15 +94,15 @@ func GetFailedSteps(runID int64) ([]StepResult, error) {
 	}
 
 	// Fetch job logs in parallel.
-	logs := make([]string, len(toFetch))
+	logs := make([]logPair, len(toFetch))
 	g, _ := errgroup.WithContext(context.Background())
 	for i, js := range toFetch {
 		g.Go(func() error {
-			log, err := fetchJobLog(js.job.DatabaseID, runID)
+			lp, err := fetchJobLog(js.job.DatabaseID, runID)
 			if err != nil {
 				return fmt.Errorf("fetching log for job %d: %w", js.job.DatabaseID, err)
 			}
-			logs[i] = log
+			logs[i] = lp
 			return nil
 		})
 	}
@@ -115,8 +115,9 @@ func GetFailedSteps(runID int64) ([]StepResult, error) {
 	for i, js := range toFetch {
 		for _, step := range js.steps {
 			failedSteps = append(failedSteps, StepResult{
-				Name: step.Name,
-				Log:  logs[i],
+				Name:   step.Name,
+				Log:    logs[i].clean,
+				RawLog: logs[i].raw,
 			})
 		}
 	}
@@ -124,25 +125,31 @@ func GetFailedSteps(runID int64) ([]StepResult, error) {
 	return failedSteps, nil
 }
 
+// logPair holds both the cleaned log (for parsers) and raw log (timestamps preserved).
+type logPair struct {
+	clean string // timestamps stripped
+	raw   string // timestamps preserved, tab-prefixes stripped
+}
+
 // fetchJobLog retrieves the raw log for a specific job, trying the REST API
 // first (faster, cleaner output) then falling back to gh run view --log.
-func fetchJobLog(jobID, runID int64) (string, error) {
+func fetchJobLog(jobID, runID int64) (logPair, error) {
 	// Try REST API: GET /repos/{owner}/{repo}/actions/jobs/{job_id}/logs
 	// Returns plain text — no tab-prefixed formatting, but still has timestamps.
 	log, err := Executor.Run("api", "repos/{owner}/{repo}/actions/jobs/"+strconv.FormatInt(jobID, 10)+"/logs")
 	if err == nil {
-		return stripTimestamps(log), nil
+		return logPair{clean: stripTimestamps(log), raw: log}, nil
 	}
 
 	// Fallback: gh run view --log --job (slower, adds job\tstep\t prefixes).
 	idStr := strconv.FormatInt(runID, 10)
 	log, err = Executor.Run("run", "view", idStr, "--log", "--job", strconv.FormatInt(jobID, 10))
 	if err != nil {
-		return "", fmt.Errorf("fetching log: %w", err)
+		return logPair{}, fmt.Errorf("fetching log: %w", err)
 	}
 
-	// Strip tab-delimited prefixes and timestamps so parsers get clean content.
-	return stripLogPrefixes(log), nil
+	// Strip tab-delimited prefixes; preserve timestamps in raw version.
+	return logPair{clean: stripLogPrefixes(log), raw: stripTabPrefixesOnly(log)}, nil
 }
 
 // timestampRe matches the GitHub Actions log timestamp prefix.
@@ -195,6 +202,34 @@ func stripLogPrefixes(log string) string {
 			continue
 		}
 		b.WriteString(stripTimestamp(rest[second+1:]))
+	}
+
+	return b.String()
+}
+
+// stripTabPrefixesOnly removes job\tstep\t prefixes from gh run view --log
+// output but preserves timestamps.
+func stripTabPrefixesOnly(log string) string {
+	var b strings.Builder
+	b.Grow(len(log))
+
+	for line := range strings.SplitSeq(log, "\n") {
+		if b.Len() > 0 {
+			b.WriteByte('\n')
+		}
+
+		first := strings.IndexByte(line, '\t')
+		if first < 0 {
+			b.WriteString(line)
+			continue
+		}
+		rest := line[first+1:]
+		second := strings.IndexByte(rest, '\t')
+		if second < 0 {
+			b.WriteString(line)
+			continue
+		}
+		b.WriteString(rest[second+1:])
 	}
 
 	return b.String()

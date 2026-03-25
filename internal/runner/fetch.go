@@ -49,8 +49,9 @@ type RunResult struct {
 
 // StepResult holds the output for a single failing step.
 type StepResult struct {
-	Name string
-	Log  string
+	Name   string
+	Log    string
+	RawLog string // Timestamp-preserved, tab-prefix-stripped version
 }
 
 // GHExecutor abstracts gh CLI execution for testing.
@@ -248,11 +249,11 @@ func getStepLog(runID int64, stepName string) (string, error) {
 	for _, job := range result.Jobs {
 		for _, step := range job.Steps {
 			if strings.Contains(strings.ToLower(step.Name), lowerStep) {
-				log, err := fetchJobLog(job.DatabaseID, runID)
+				lp, err := fetchJobLog(job.DatabaseID, runID)
 				if err != nil {
 					return "", err
 				}
-				return log, nil
+				return lp.clean, nil
 			}
 		}
 	}

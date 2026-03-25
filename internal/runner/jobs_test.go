@@ -240,6 +240,122 @@ func TestStripLogPrefixes_WithTimestamps(t *testing.T) {
 	}
 }
 
+func TestStripTabPrefixesOnly(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			"strips tab prefixes preserves timestamps",
+			"test\tRun tests\t2026-03-16T13:34:37.3465175Z content here\n" +
+				"test\tRun tests\t2026-03-16T13:34:38.1234567Z more content",
+			"2026-03-16T13:34:37.3465175Z content here\n" +
+				"2026-03-16T13:34:38.1234567Z more content",
+		},
+		{
+			"no tabs preserves line",
+			"no tabs here",
+			"no tabs here",
+		},
+		{
+			"single tab preserves line",
+			"only\tone tab",
+			"only\tone tab",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := stripTabPrefixesOnly(tt.input)
+			if got != tt.want {
+				t.Errorf("stripTabPrefixesOnly() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetFailedSteps_RawLogPreservesTimestamps(t *testing.T) {
+	stub := newStubExecutor()
+	stub.handlers["run view 100 --json jobs"] = `{
+		"jobs": [
+			{
+				"databaseId": 1002,
+				"name": "test",
+				"status": "completed",
+				"conclusion": "failure",
+				"steps": [
+					{"name": "Run tests", "status": "completed", "conclusion": "failure", "number": 1}
+				]
+			}
+		]
+	}`
+	// API-style raw log with timestamps.
+	stub.handlers["api repos/{owner}/{repo}/actions/jobs/1002/logs"] = "2026-03-20T12:15:15.1234567Z --- FAIL: TestFoo (0.01s)\n2026-03-20T12:15:16.1234567Z FAIL"
+
+	orig := Executor
+	Executor = stub
+	defer func() { Executor = orig }()
+
+	steps, err := GetFailedSteps(100)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(steps) != 1 {
+		t.Fatalf("expected 1 step, got %d", len(steps))
+	}
+	// Log should have timestamps stripped.
+	if strings.Contains(steps[0].Log, "2026-03-20") {
+		t.Errorf("Log should not contain timestamps, got: %q", steps[0].Log)
+	}
+	// RawLog should preserve timestamps.
+	if !strings.Contains(steps[0].RawLog, "2026-03-20T12:15:15.1234567Z") {
+		t.Errorf("RawLog should preserve timestamps, got: %q", steps[0].RawLog)
+	}
+}
+
+func TestGetFailedSteps_FallbackRawLogPreservesTimestamps(t *testing.T) {
+	stub := newStubExecutor()
+	stub.handlers["run view 100 --json jobs"] = `{
+		"jobs": [
+			{
+				"databaseId": 1002,
+				"name": "test",
+				"status": "completed",
+				"conclusion": "failure",
+				"steps": [
+					{"name": "Run tests", "status": "completed", "conclusion": "failure", "number": 1}
+				]
+			}
+		]
+	}`
+	// API fails, fallback to gh run view --log --job (with tab prefixes + timestamps).
+	stub.handlers["run view 100 --log --job 1002"] = "test\tRun tests\t2026-03-20T12:15:15.1234567Z --- FAIL: TestFoo"
+
+	orig := Executor
+	Executor = stub
+	defer func() { Executor = orig }()
+
+	steps, err := GetFailedSteps(100)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(steps) != 1 {
+		t.Fatalf("expected 1 step, got %d", len(steps))
+	}
+	// Log should have both tab prefixes and timestamps stripped.
+	if strings.Contains(steps[0].Log, "2026-03-20") || strings.Contains(steps[0].Log, "test\t") {
+		t.Errorf("Log should be clean, got: %q", steps[0].Log)
+	}
+	// RawLog should have tab prefixes stripped but timestamps preserved.
+	if !strings.Contains(steps[0].RawLog, "2026-03-20T12:15:15.1234567Z") {
+		t.Errorf("RawLog should preserve timestamps, got: %q", steps[0].RawLog)
+	}
+	if strings.Contains(steps[0].RawLog, "test\t") {
+		t.Errorf("RawLog should not contain tab prefixes, got: %q", steps[0].RawLog)
+	}
+}
+
 func TestShouldSkipStep(t *testing.T) {
 	tests := []struct {
 		name string
