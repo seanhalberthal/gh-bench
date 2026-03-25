@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"strings"
 	"testing"
 )
@@ -35,7 +36,7 @@ func TestGetFailedSteps_SingleFailure(t *testing.T) {
 	Executor = stub
 	defer func() { Executor = orig }()
 
-	steps, err := GetFailedSteps(100)
+	steps, err := GetFailedSteps(context.Background(),100)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -72,7 +73,7 @@ func TestGetFailedSteps_FallsBackToRunView(t *testing.T) {
 	Executor = stub
 	defer func() { Executor = orig }()
 
-	steps, err := GetFailedSteps(100)
+	steps, err := GetFailedSteps(context.Background(),100)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -108,7 +109,7 @@ func TestGetFailedSteps_NoFailures(t *testing.T) {
 	Executor = stub
 	defer func() { Executor = orig }()
 
-	steps, err := GetFailedSteps(200)
+	steps, err := GetFailedSteps(context.Background(),200)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -125,7 +126,7 @@ func TestGetFailedSteps_InvalidJSON(t *testing.T) {
 	Executor = stub
 	defer func() { Executor = orig }()
 
-	_, err := GetFailedSteps(300)
+	_, err := GetFailedSteps(context.Background(),300)
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
 	}
@@ -155,7 +156,7 @@ func TestGetFailedSteps_SkipsInfrastructureSteps(t *testing.T) {
 	Executor = stub
 	defer func() { Executor = orig }()
 
-	steps, err := GetFailedSteps(500)
+	steps, err := GetFailedSteps(context.Background(),500)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -297,7 +298,7 @@ func TestGetFailedSteps_RawLogPreservesTimestamps(t *testing.T) {
 	Executor = stub
 	defer func() { Executor = orig }()
 
-	steps, err := GetFailedSteps(100)
+	steps, err := GetFailedSteps(context.Background(),100)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -336,7 +337,7 @@ func TestGetFailedSteps_FallbackRawLogPreservesTimestamps(t *testing.T) {
 	Executor = stub
 	defer func() { Executor = orig }()
 
-	steps, err := GetFailedSteps(100)
+	steps, err := GetFailedSteps(context.Background(),100)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

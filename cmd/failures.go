@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/seanhalberthal/gh-bench/internal/parser"
@@ -216,13 +218,17 @@ func printFailuresJSON(enriched []enrichedRun) error {
 }
 
 func printFailuresCSV(enriched []enrichedRun) error {
-	fmt.Println("run_id,title,date,branch,step,framework,test_name,message,location,timestamp")
+	w := csv.NewWriter(os.Stdout)
+	defer w.Flush()
+
+	w.Write([]string{"run_id", "title", "date", "branch", "step", "framework", "test_name", "message", "location", "timestamp"})
 	for _, r := range enriched {
 		for _, step := range r.Steps {
 			for _, f := range step.Failures {
-				fmt.Printf("%d,%q,%q,%q,%q,%q,%q,%q,%q,%q\n",
-					r.RunID, r.Title, r.Date, r.Branch, step.Name,
-					step.Framework, f.TestName, f.Message, f.Location, f.Timestamp)
+				w.Write([]string{
+					strconv.FormatInt(r.RunID, 10), r.Title, r.Date, r.Branch, step.Name,
+					step.Framework, f.TestName, f.Message, f.Location, f.Timestamp,
+				})
 			}
 		}
 	}

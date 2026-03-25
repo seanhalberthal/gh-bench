@@ -49,7 +49,7 @@ type Step struct {
 }
 
 // GetFailedSteps retrieves the failed steps for a workflow run and fetches their logs.
-func GetFailedSteps(runID int64) ([]StepResult, error) {
+func GetFailedSteps(ctx context.Context, runID int64) ([]StepResult, error) {
 	idStr := strconv.FormatInt(runID, 10)
 
 	out, err := Executor.Run("run", "view", idStr, "--json", "jobs")
@@ -95,10 +95,10 @@ func GetFailedSteps(runID int64) ([]StepResult, error) {
 
 	// Fetch job logs in parallel.
 	logs := make([]logPair, len(toFetch))
-	g, _ := errgroup.WithContext(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
 	for i, js := range toFetch {
 		g.Go(func() error {
-			lp, err := fetchJobLog(js.job.DatabaseID, runID)
+			lp, err := fetchJobLog(ctx, js.job.DatabaseID, runID)
 			if err != nil {
 				return fmt.Errorf("fetching log for job %d: %w", js.job.DatabaseID, err)
 			}
@@ -133,7 +133,7 @@ type logPair struct {
 
 // fetchJobLog retrieves the raw log for a specific job, trying the REST API
 // first (faster, cleaner output) then falling back to gh run view --log.
-func fetchJobLog(jobID, runID int64) (logPair, error) {
+func fetchJobLog(_ context.Context, jobID, runID int64) (logPair, error) {
 	// Try REST API: GET /repos/{owner}/{repo}/actions/jobs/{job_id}/logs
 	// Returns plain text — no tab-prefixed formatting, but still has timestamps.
 	log, err := Executor.Run("api", "repos/{owner}/{repo}/actions/jobs/"+strconv.FormatInt(jobID, 10)+"/logs")
