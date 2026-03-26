@@ -15,9 +15,9 @@ func TestResolveFormat(t *testing.T) {
 	}
 
 	tests := []struct {
-		name   string
-		setup  func(*cobra.Command)
-		want   string
+		name  string
+		setup func(*cobra.Command)
+		want  string
 	}{
 		{
 			"default is table",
@@ -26,19 +26,19 @@ func TestResolveFormat(t *testing.T) {
 		},
 		{
 			"format flag json",
-			func(cmd *cobra.Command) { cmd.Flags().Set("format", "json") },
+			func(cmd *cobra.Command) { _ = cmd.Flags().Set("format", "json") },
 			"json",
 		},
 		{
 			"format flag csv",
-			func(cmd *cobra.Command) { cmd.Flags().Set("format", "csv") },
+			func(cmd *cobra.Command) { _ = cmd.Flags().Set("format", "csv") },
 			"csv",
 		},
 		{
 			"json flag overrides format",
 			func(cmd *cobra.Command) {
-				cmd.Flags().Set("format", "csv")
-				cmd.Flags().Set("json", "true")
+				_ = cmd.Flags().Set("format", "csv")
+				_ = cmd.Flags().Set("json", "true")
 			},
 			"json",
 		},

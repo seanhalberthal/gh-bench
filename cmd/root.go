@@ -17,9 +17,10 @@ var Version = "dev"
 var cfg config.Config
 
 var rootCmd = &cobra.Command{
-	Use:   "bench",
-	Short: "CI benchmarking and failure extraction for GitHub Actions",
-	Long:  "gh bench extracts numeric values from CI run logs, aggregates stats, and surfaces structured errors from failed runs.",
+	Use:     "bench",
+	Short:   "CI benchmarking and failure extraction for GitHub Actions",
+	Long:    "gh bench extracts numeric values from CI run logs, aggregates stats, and surfaces structured errors from failed runs.",
+	Version: Version,
 	Annotations: map[string]string{
 		cobra.CommandDisplayNameAnnotation: "gh bench",
 	},

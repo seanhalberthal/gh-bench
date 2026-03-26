@@ -221,14 +221,18 @@ func printFailuresCSV(enriched []enrichedRun) error {
 	w := csv.NewWriter(os.Stdout)
 	defer w.Flush()
 
-	w.Write([]string{"run_id", "title", "date", "branch", "step", "framework", "test_name", "message", "location", "timestamp"})
+	if err := w.Write([]string{"run_id", "title", "date", "branch", "step", "framework", "test_name", "message", "location", "timestamp"}); err != nil {
+		return err
+	}
 	for _, r := range enriched {
 		for _, step := range r.Steps {
 			for _, f := range step.Failures {
-				w.Write([]string{
+				if err := w.Write([]string{
 					strconv.FormatInt(r.RunID, 10), r.Title, r.Date, r.Branch, step.Name,
 					step.Framework, f.TestName, f.Message, f.Location, f.Timestamp,
-				})
+				}); err != nil {
+					return err
+				}
 			}
 		}
 	}

@@ -174,17 +174,23 @@ func printStatsCSV(values runner.ExtractedValues, aggs map[string]float64) error
 	defer w.Flush()
 
 	hasLabels := values.HasLabels()
+	var header []string
 	if hasLabels {
-		w.Write([]string{"run_id", "label", "value"})
+		header = []string{"run_id", "label", "value"}
 	} else {
-		w.Write([]string{"run_id", "title", "value"})
+		header = []string{"run_id", "title", "value"}
+	}
+	if err := w.Write(header); err != nil {
+		return err
 	}
 	for _, v := range values {
 		desc := v.Title
 		if hasLabels {
 			desc = v.Label
 		}
-		w.Write([]string{strconv.FormatInt(v.RunID, 10), desc, v.Raw})
+		if err := w.Write([]string{strconv.FormatInt(v.RunID, 10), desc, v.Raw}); err != nil {
+			return err
+		}
 	}
 
 	// Aggregation summary rows.
@@ -194,7 +200,9 @@ func printStatsCSV(values runner.ExtractedValues, aggs map[string]float64) error
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		w.Write([]string{"", k, strconv.FormatFloat(aggs[k], 'f', -1, 64)})
+		if err := w.Write([]string{"", k, strconv.FormatFloat(aggs[k], 'f', -1, 64)}); err != nil {
+			return err
+		}
 	}
 	return nil
 }

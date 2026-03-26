@@ -36,7 +36,7 @@ func TestGetFailedSteps_SingleFailure(t *testing.T) {
 	Executor = stub
 	defer func() { Executor = orig }()
 
-	steps, err := GetFailedSteps(context.Background(),100)
+	steps, err := GetFailedSteps(context.Background(), 100)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -73,7 +73,7 @@ func TestGetFailedSteps_FallsBackToRunView(t *testing.T) {
 	Executor = stub
 	defer func() { Executor = orig }()
 
-	steps, err := GetFailedSteps(context.Background(),100)
+	steps, err := GetFailedSteps(context.Background(), 100)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestGetFailedSteps_NoFailures(t *testing.T) {
 	Executor = stub
 	defer func() { Executor = orig }()
 
-	steps, err := GetFailedSteps(context.Background(),200)
+	steps, err := GetFailedSteps(context.Background(), 200)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestGetFailedSteps_InvalidJSON(t *testing.T) {
 	Executor = stub
 	defer func() { Executor = orig }()
 
-	_, err := GetFailedSteps(context.Background(),300)
+	_, err := GetFailedSteps(context.Background(), 300)
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
 	}
@@ -156,7 +156,7 @@ func TestGetFailedSteps_SkipsInfrastructureSteps(t *testing.T) {
 	Executor = stub
 	defer func() { Executor = orig }()
 
-	steps, err := GetFailedSteps(context.Background(),500)
+	steps, err := GetFailedSteps(context.Background(), 500)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -176,7 +176,6 @@ func TestStripLogPrefixes(t *testing.T) {
 		t.Errorf("unexpected result: %q", result)
 	}
 }
-
 
 func TestStripLogPrefixes_WithTimestamps(t *testing.T) {
 	// Real-world GitHub Actions log format: job\tstep\ttimestamp content
@@ -247,7 +246,7 @@ func TestGetFailedSteps_RawLogPreservesTimestamps(t *testing.T) {
 	Executor = stub
 	defer func() { Executor = orig }()
 
-	steps, err := GetFailedSteps(context.Background(),100)
+	steps, err := GetFailedSteps(context.Background(), 100)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -286,7 +285,7 @@ func TestGetFailedSteps_FallbackRawLogPreservesTimestamps(t *testing.T) {
 	Executor = stub
 	defer func() { Executor = orig }()
 
-	steps, err := GetFailedSteps(context.Background(),100)
+	steps, err := GetFailedSteps(context.Background(), 100)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

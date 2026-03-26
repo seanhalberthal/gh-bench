@@ -36,7 +36,7 @@ Global `--json` flag on root command switches output format.
 - `FetchLogs()` fetches concurrently using `errgroup` with configurable concurrency
 - `ListRuns()` queries workflow runs returning IDs and branch names (used for open-PR filtering)
 - `ListOpenPRBranches()` returns the set of branches with open pull requests
-- All log paths strip GitHub Actions `job\tstep\t` tab prefixes and ISO 8601 timestamps via `stripLogPrefixes()`
+- All log paths strip GitHub Actions `job\tstep\t` tab prefixes and ISO 8601 timestamps via `stripLogPrefixes()` (delegates to `logutil.StripTimestamp`)
 - `GetFailedSteps()` parses job/step JSON to isolate failed step logs
 - `ExtractValues()` applies regex with named capture groups to extract numeric values; supports optional `(?P<label>...)` group for row-level context
 
@@ -44,12 +44,17 @@ Global `--json` flag on root command switches output format.
 - `FrameworkParser` interface: `Name()`, `Detect(logs)`, `Extract(logs)`
 - Detection order: DotNet → Go → Vitest → Fallback (first match wins)
 - Each parser uses regex to find failures, then looks backward/forward for error context
+- `AnnotateTimestamps()` enriches parsed failures with timestamps from raw (pre-stripped) log lines
 - Test data lives in `internal/parser/testdata/` (real CI log samples)
 
 **`internal/config/`** — Project-level configuration
 - Loads `.gh-bench.yml` from the working directory, walking up to the git root
 - Provides defaults for `workflow` (all commands) and `failures.exclude-steps`
 - CLI flags override config values when explicitly set
+
+**`internal/logutil/`** — Shared log-line utilities
+- `StripTimestamp()` removes the ISO 8601 timestamp prefix from a single log line
+- `StripTimestamps()` applies stripping across an entire log string
 
 **`internal/stats/`** — Statistical aggregation
 - `Compute(values, aggNames)` dispatches to median/mean/p95/min/max

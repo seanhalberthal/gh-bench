@@ -197,7 +197,6 @@ func fetchJobLog(_ context.Context, jobID, runID int64) (logPair, error) {
 	return logPair{clean: stripLogPrefixes(log), raw: stripTabPrefixesOnly(log)}, nil
 }
 
-
 // stripLogPrefixes removes job\tstep\t prefixes and GitHub Actions timestamps
 // from gh run view --log output.
 func stripLogPrefixes(log string) string {

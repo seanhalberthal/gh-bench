@@ -8,9 +8,9 @@ import (
 
 func TestExtractTimestamp(t *testing.T) {
 	tests := []struct {
-		name  string
-		line  string
-		want  string
+		name string
+		line string
+		want string
 	}{
 		{
 			"standard timestamp",
@@ -186,9 +186,5 @@ func TestAnnotateTimestamps_Vitest_RoundTrip(t *testing.T) {
 }
 
 func splitLines(s string) []string {
-	var lines []string
-	for _, l := range strings.Split(s, "\n") {
-		lines = append(lines, l)
-	}
-	return lines
+	return strings.Split(s, "\n")
 }

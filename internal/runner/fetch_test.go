@@ -38,11 +38,6 @@ func (s *stubExecutor) Run(args ...string) (string, error) {
 	return "", fmt.Errorf("no handler for: %s", key)
 }
 
-func (s *stubExecutor) callCount() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return len(s.calls)
-}
 
 func TestFetchLogs_WithRunIDs(t *testing.T) {
 	stub := newStubExecutor()
