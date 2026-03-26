@@ -49,8 +49,9 @@ type RunResult struct {
 
 // StepResult holds the output for a single failing step.
 type StepResult struct {
-	Name string
-	Log  string
+	Name   string
+	Log    string
+	RawLog string // Timestamp-preserved, tab-prefix-stripped version
 }
 
 // GHExecutor abstracts gh CLI execution for testing.
@@ -171,7 +172,7 @@ func listRunIDs(opts FetchOpts) ([]int64, error) {
 	return ids, nil
 }
 
-func fetchSingleRun(_ context.Context, runID int64, opts fetchRunOpts) (RunResult, error) {
+func fetchSingleRun(ctx context.Context, runID int64, opts fetchRunOpts) (RunResult, error) {
 	idStr := strconv.FormatInt(runID, 10)
 
 	// Get run metadata
@@ -200,7 +201,7 @@ func fetchSingleRun(_ context.Context, runID int64, opts fetchRunOpts) (RunResul
 
 	if opts.FailedOnly {
 		// Get failed steps via jobs API
-		steps, err := GetFailedSteps(runID)
+		steps, err := GetFailedSteps(ctx, runID)
 		if err != nil {
 			return result, fmt.Errorf("fetching failed steps: %w", err)
 		}
@@ -209,7 +210,7 @@ func fetchSingleRun(_ context.Context, runID int64, opts fetchRunOpts) (RunResul
 		}
 		result.FailedSteps = steps
 	} else if opts.Step != "" {
-		log, err := getStepLog(runID, opts.Step)
+		log, err := getStepLog(ctx, runID, opts.Step)
 		if err != nil {
 			return result, fmt.Errorf("fetching step log: %w", err)
 		}
@@ -229,7 +230,7 @@ func fetchSingleRun(_ context.Context, runID int64, opts fetchRunOpts) (RunResul
 // getStepLog fetches the log for a specific step name within a run.
 // It finds the first step matching the name (case-insensitive contains)
 // across all jobs in the run.
-func getStepLog(runID int64, stepName string) (string, error) {
+func getStepLog(ctx context.Context, runID int64, stepName string) (string, error) {
 	idStr := strconv.FormatInt(runID, 10)
 
 	out, err := Executor.Run("run", "view", idStr, "--json", "jobs")
@@ -248,11 +249,11 @@ func getStepLog(runID int64, stepName string) (string, error) {
 	for _, job := range result.Jobs {
 		for _, step := range job.Steps {
 			if strings.Contains(strings.ToLower(step.Name), lowerStep) {
-				log, err := fetchJobLog(job.DatabaseID, runID)
+				lp, err := fetchJobLog(ctx, job.DatabaseID, runID)
 				if err != nil {
 					return "", err
 				}
-				return log, nil
+				return lp.clean, nil
 			}
 		}
 	}

@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+- Failure timestamps — `failures` output now includes the timestamp when each test failure occurred, extracted from raw CI log lines
+- `--version` / `-v` flag on the root command to print the current version
+- New `internal/logutil` package consolidating shared timestamp-stripping logic
+
+### Fixed
+- JSON and CSV output for `stats` and `failures` now uses `encoding/json` and `encoding/csv` instead of hand-rolled serialisation
+- Test data race in `stubExecutor` resolved with mutex
+
+## [0.1.8]
+
 ### Fixed
 - `failures` command no longer treats cancelled steps as failures — only steps with a `failure` conclusion are reported
 - Runs where every step was cancelled are now silently dropped instead of appearing as empty failures

@@ -3,6 +3,8 @@ package parser
 import (
 	"regexp"
 	"strings"
+
+	"github.com/seanhalberthal/gh-bench/internal/logutil"
 )
 
 const fallbackLines = 30
@@ -85,7 +87,7 @@ func (f *FallbackParser) Extract(logs string) []Failure {
 	var filtered []string
 
 	for _, raw := range rawLines {
-		line := stripTimestamp(raw)
+		line := logutil.StripTimestamp(raw)
 
 		// Collect ##[error] lines — these are the primary signal.
 		trimmed := strings.TrimSpace(line)

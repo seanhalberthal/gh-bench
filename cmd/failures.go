@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/seanhalberthal/gh-bench/internal/parser"
@@ -123,6 +125,7 @@ func runFailures(cmd *cobra.Command, args []string) error {
 		er := enrichedRun{RunResult: r, Steps: make([]enrichedStep, len(r.FailedSteps))}
 		for si, step := range r.FailedSteps {
 			failures := parser.Parse(step.Log)
+			parser.AnnotateTimestamps(failures, step.RawLog)
 			fw := "unknown"
 			if len(failures) > 0 {
 				fw = failures[0].Framework
@@ -215,13 +218,21 @@ func printFailuresJSON(enriched []enrichedRun) error {
 }
 
 func printFailuresCSV(enriched []enrichedRun) error {
-	fmt.Println("run_id,title,date,branch,step,framework,test_name,message,location")
+	w := csv.NewWriter(os.Stdout)
+	defer w.Flush()
+
+	if err := w.Write([]string{"run_id", "title", "date", "branch", "step", "framework", "test_name", "message", "location", "timestamp"}); err != nil {
+		return err
+	}
 	for _, r := range enriched {
 		for _, step := range r.Steps {
 			for _, f := range step.Failures {
-				fmt.Printf("%d,%q,%q,%q,%q,%q,%q,%q,%q\n",
-					r.RunID, r.Title, r.Date, r.Branch, step.Name,
-					step.Framework, f.TestName, f.Message, f.Location)
+				if err := w.Write([]string{
+					strconv.FormatInt(r.RunID, 10), r.Title, r.Date, r.Branch, step.Name,
+					step.Framework, f.TestName, f.Message, f.Location, f.Timestamp,
+				}); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -252,9 +263,14 @@ func printFailuresText(enriched []enrichedRun) error {
 
 			fmt.Fprintf(&b, "  Failed Tests (%d)\n\n", len(step.Failures))
 			for _, f := range step.Failures {
-				if f.Duration != "" {
+				switch {
+				case f.Duration != "" && f.Timestamp != "":
+					fmt.Fprintf(&b, "  ✗ %s [%s] @ %s\n", f.TestName, f.Duration, f.Timestamp)
+				case f.Duration != "":
 					fmt.Fprintf(&b, "  ✗ %s [%s]\n", f.TestName, f.Duration)
-				} else {
+				case f.Timestamp != "":
+					fmt.Fprintf(&b, "  ✗ %s @ %s\n", f.TestName, f.Timestamp)
+				default:
 					fmt.Fprintf(&b, "  ✗ %s\n", f.TestName)
 				}
 				if f.Message != "" {

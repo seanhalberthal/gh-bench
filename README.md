@@ -74,7 +74,7 @@ Either `--pattern` or `--preset` is required. Either `--workflow` or `--runs` is
 
 ### `gh bench failures`
 
-Fetch failed CI runs, identify failing steps, and extract structured errors using framework-aware parsers.
+Fetch failed CI runs, identify failing steps, and extract structured errors using framework-aware parsers. Each failure is annotated with the timestamp from the raw CI log, so you can see exactly when it occurred.
 
 By default, only runs from branches with **open pull requests** are shown — keeping the output focused on actionable failures. Use `--all` to include all failed runs, or `--branch` to target a specific branch.
 
@@ -186,7 +186,7 @@ $ gh bench failures --runs 23341983210
 
   Failed Tests (1)
 
-  ✗ Acme.IntegrationTests.TokenManagement.ExchangeCodeForTokens_ReturnsBadRequest [1 s]
+  ✗ Acme.IntegrationTests.TokenManagement.ExchangeCodeForTokens_ReturnsBadRequest [1 s] @ 20/03/26 12:03:45
       Shouldly.ShouldAssertException : errors[0].Reason
       should start with "Microsoft 365 authentication fai"
       but was "An unexpected error occurred..."

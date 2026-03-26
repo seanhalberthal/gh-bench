@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"strings"
 	"testing"
 )
@@ -35,7 +36,7 @@ func TestGetFailedSteps_SingleFailure(t *testing.T) {
 	Executor = stub
 	defer func() { Executor = orig }()
 
-	steps, err := GetFailedSteps(100)
+	steps, err := GetFailedSteps(context.Background(), 100)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -72,7 +73,7 @@ func TestGetFailedSteps_FallsBackToRunView(t *testing.T) {
 	Executor = stub
 	defer func() { Executor = orig }()
 
-	steps, err := GetFailedSteps(100)
+	steps, err := GetFailedSteps(context.Background(), 100)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -108,7 +109,7 @@ func TestGetFailedSteps_NoFailures(t *testing.T) {
 	Executor = stub
 	defer func() { Executor = orig }()
 
-	steps, err := GetFailedSteps(200)
+	steps, err := GetFailedSteps(context.Background(), 200)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -125,7 +126,7 @@ func TestGetFailedSteps_InvalidJSON(t *testing.T) {
 	Executor = stub
 	defer func() { Executor = orig }()
 
-	_, err := GetFailedSteps(300)
+	_, err := GetFailedSteps(context.Background(), 300)
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
 	}
@@ -155,7 +156,7 @@ func TestGetFailedSteps_SkipsInfrastructureSteps(t *testing.T) {
 	Executor = stub
 	defer func() { Executor = orig }()
 
-	steps, err := GetFailedSteps(500)
+	steps, err := GetFailedSteps(context.Background(), 500)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -176,58 +177,6 @@ func TestStripLogPrefixes(t *testing.T) {
 	}
 }
 
-func TestStripTimestamp(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-		want  string
-	}{
-		{
-			"standard timestamp",
-			"2026-03-16T13:34:37.3465175Z ok  \tgithub.com/foo/bar\t1.234s",
-			"ok  \tgithub.com/foo/bar\t1.234s",
-		},
-		{
-			"short fractional seconds",
-			"2026-03-16T13:34:37.3Z some output",
-			"some output",
-		},
-		{
-			"no timestamp",
-			"ok  \tgithub.com/foo/bar\t1.234s",
-			"ok  \tgithub.com/foo/bar\t1.234s",
-		},
-		{
-			"empty line",
-			"",
-			"",
-		},
-		{
-			"too short",
-			"2026-03",
-			"2026-03",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := stripTimestamp(tt.input)
-			if got != tt.want {
-				t.Errorf("stripTimestamp(%q) = %q, want %q", tt.input, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestStripTimestamps(t *testing.T) {
-	input := "2026-03-16T13:34:37.3465175Z line one\n2026-03-16T13:34:37.3558618Z line two\nno timestamp"
-	got := stripTimestamps(input)
-	want := "line one\nline two\nno timestamp"
-	if got != want {
-		t.Errorf("stripTimestamps() = %q, want %q", got, want)
-	}
-}
-
 func TestStripLogPrefixes_WithTimestamps(t *testing.T) {
 	// Real-world GitHub Actions log format: job\tstep\ttimestamp content
 	input := "test\tRun tests\t2026-03-16T13:34:37.3465175Z ok  \tgithub.com/foo/bar\t1.234s\n" +
@@ -237,6 +186,213 @@ func TestStripLogPrefixes_WithTimestamps(t *testing.T) {
 	want := "ok  \tgithub.com/foo/bar\t1.234s\nok  \tgithub.com/foo/baz\t0.567s\nno tabs here"
 	if got != want {
 		t.Errorf("stripLogPrefixes() = %q, want %q", got, want)
+	}
+}
+
+func TestStripTabPrefixesOnly(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			"strips tab prefixes preserves timestamps",
+			"test\tRun tests\t2026-03-16T13:34:37.3465175Z content here\n" +
+				"test\tRun tests\t2026-03-16T13:34:38.1234567Z more content",
+			"2026-03-16T13:34:37.3465175Z content here\n" +
+				"2026-03-16T13:34:38.1234567Z more content",
+		},
+		{
+			"no tabs preserves line",
+			"no tabs here",
+			"no tabs here",
+		},
+		{
+			"single tab preserves line",
+			"only\tone tab",
+			"only\tone tab",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := stripTabPrefixesOnly(tt.input)
+			if got != tt.want {
+				t.Errorf("stripTabPrefixesOnly() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetFailedSteps_RawLogPreservesTimestamps(t *testing.T) {
+	stub := newStubExecutor()
+	stub.handlers["run view 100 --json jobs"] = `{
+		"jobs": [
+			{
+				"databaseId": 1002,
+				"name": "test",
+				"status": "completed",
+				"conclusion": "failure",
+				"steps": [
+					{"name": "Run tests", "status": "completed", "conclusion": "failure", "number": 1}
+				]
+			}
+		]
+	}`
+	// API-style raw log with timestamps.
+	stub.handlers["api repos/{owner}/{repo}/actions/jobs/1002/logs"] = "2026-03-20T12:15:15.1234567Z --- FAIL: TestFoo (0.01s)\n2026-03-20T12:15:16.1234567Z FAIL"
+
+	orig := Executor
+	Executor = stub
+	defer func() { Executor = orig }()
+
+	steps, err := GetFailedSteps(context.Background(), 100)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(steps) != 1 {
+		t.Fatalf("expected 1 step, got %d", len(steps))
+	}
+	// Log should have timestamps stripped.
+	if strings.Contains(steps[0].Log, "2026-03-20") {
+		t.Errorf("Log should not contain timestamps, got: %q", steps[0].Log)
+	}
+	// RawLog should preserve timestamps.
+	if !strings.Contains(steps[0].RawLog, "2026-03-20T12:15:15.1234567Z") {
+		t.Errorf("RawLog should preserve timestamps, got: %q", steps[0].RawLog)
+	}
+}
+
+func TestGetFailedSteps_FallbackRawLogPreservesTimestamps(t *testing.T) {
+	stub := newStubExecutor()
+	stub.handlers["run view 100 --json jobs"] = `{
+		"jobs": [
+			{
+				"databaseId": 1002,
+				"name": "test",
+				"status": "completed",
+				"conclusion": "failure",
+				"steps": [
+					{"name": "Run tests", "status": "completed", "conclusion": "failure", "number": 1}
+				]
+			}
+		]
+	}`
+	// API fails, fallback to gh run view --log --job (with tab prefixes + timestamps).
+	stub.handlers["run view 100 --log --job 1002"] = "test\tRun tests\t2026-03-20T12:15:15.1234567Z --- FAIL: TestFoo"
+
+	orig := Executor
+	Executor = stub
+	defer func() { Executor = orig }()
+
+	steps, err := GetFailedSteps(context.Background(), 100)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(steps) != 1 {
+		t.Fatalf("expected 1 step, got %d", len(steps))
+	}
+	// Log should have both tab prefixes and timestamps stripped.
+	if strings.Contains(steps[0].Log, "2026-03-20") || strings.Contains(steps[0].Log, "test\t") {
+		t.Errorf("Log should be clean, got: %q", steps[0].Log)
+	}
+	// RawLog should have tab prefixes stripped but timestamps preserved.
+	if !strings.Contains(steps[0].RawLog, "2026-03-20T12:15:15.1234567Z") {
+		t.Errorf("RawLog should preserve timestamps, got: %q", steps[0].RawLog)
+	}
+	if strings.Contains(steps[0].RawLog, "test\t") {
+		t.Errorf("RawLog should not contain tab prefixes, got: %q", steps[0].RawLog)
+	}
+}
+
+func TestSegmentByStep(t *testing.T) {
+	log := "##[group]Run tests\nFAIL: TestFoo\nerror at line 42\n##[endgroup]\n##[group]Generate coverage\ncoverage: 80%\n##[endgroup]"
+
+	t.Run("extracts matching step", func(t *testing.T) {
+		got := segmentByStep(log, "Run tests")
+		want := "FAIL: TestFoo\nerror at line 42"
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("extracts second step", func(t *testing.T) {
+		got := segmentByStep(log, "Generate coverage")
+		want := "coverage: 80%"
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("case insensitive match", func(t *testing.T) {
+		got := segmentByStep(log, "run tests")
+		if !strings.Contains(got, "FAIL: TestFoo") {
+			t.Errorf("expected case-insensitive match, got %q", got)
+		}
+	})
+
+	t.Run("no markers falls back to full log", func(t *testing.T) {
+		plain := "just some log output\nno markers here"
+		got := segmentByStep(plain, "Run tests")
+		if got != plain {
+			t.Errorf("expected full log fallback, got %q", got)
+		}
+	})
+
+	t.Run("no matching step falls back to full log", func(t *testing.T) {
+		got := segmentByStep(log, "Nonexistent step")
+		if got != log {
+			t.Errorf("expected full log fallback, got %q", got)
+		}
+	})
+}
+
+func TestGetFailedSteps_MultipleStepsSegmented(t *testing.T) {
+	stub := newStubExecutor()
+	stub.handlers["run view 100 --json jobs"] = `{
+		"jobs": [
+			{
+				"databaseId": 1002,
+				"name": "test",
+				"status": "completed",
+				"conclusion": "failure",
+				"steps": [
+					{"name": "Run tests", "status": "completed", "conclusion": "failure", "number": 1},
+					{"name": "Generate coverage", "status": "completed", "conclusion": "failure", "number": 2}
+				]
+			}
+		]
+	}`
+	stub.handlers["api repos/{owner}/{repo}/actions/jobs/1002/logs"] =
+		"2026-03-20T12:15:15.1234567Z ##[group]Run tests\n" +
+			"2026-03-20T12:15:16.1234567Z FAIL: TestFoo\n" +
+			"2026-03-20T12:15:17.1234567Z ##[endgroup]\n" +
+			"2026-03-20T12:15:18.1234567Z ##[group]Generate coverage\n" +
+			"2026-03-20T12:15:19.1234567Z coverage: 80%\n" +
+			"2026-03-20T12:15:20.1234567Z ##[endgroup]"
+
+	orig := Executor
+	Executor = stub
+	defer func() { Executor = orig }()
+
+	steps, err := GetFailedSteps(context.Background(), 100)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(steps) != 2 {
+		t.Fatalf("expected 2 steps, got %d", len(steps))
+	}
+	if !strings.Contains(steps[0].Log, "FAIL: TestFoo") {
+		t.Errorf("step 0 should contain test failure, got %q", steps[0].Log)
+	}
+	if strings.Contains(steps[0].Log, "coverage: 80%") {
+		t.Errorf("step 0 should not contain coverage output, got %q", steps[0].Log)
+	}
+	if !strings.Contains(steps[1].Log, "coverage: 80%") {
+		t.Errorf("step 1 should contain coverage output, got %q", steps[1].Log)
+	}
+	if strings.Contains(steps[1].Log, "FAIL: TestFoo") {
+		t.Errorf("step 1 should not contain test failure, got %q", steps[1].Log)
 	}
 }
 

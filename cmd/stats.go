@@ -1,8 +1,11 @@
 package cmd
 
 import (
+	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -134,48 +137,71 @@ func parseRunIDs(s string) ([]int64, error) {
 }
 
 func printStatsJSON(values runner.ExtractedValues, aggs map[string]float64) error {
+	type runEntry struct {
+		RunID int64   `json:"run_id"`
+		Label string  `json:"label,omitempty"`
+		Title string  `json:"title,omitempty"`
+		Value float64 `json:"value"`
+	}
+
+	type statsOutput struct {
+		Runs         []runEntry         `json:"runs"`
+		Aggregations map[string]float64 `json:"aggregations"`
+	}
+
 	hasLabels := values.HasLabels()
-	fmt.Println("{")
-	fmt.Println("  \"runs\": [")
+	runs := make([]runEntry, len(values))
 	for i, v := range values {
-		comma := ","
-		if i == len(values)-1 {
-			comma = ""
-		}
+		e := runEntry{RunID: v.RunID, Value: v.Value}
 		if hasLabels {
-			fmt.Printf("    {\"run_id\": %d, \"label\": %q, \"value\": %s}%s\n", v.RunID, v.Label, v.Raw, comma)
+			e.Label = v.Label
 		} else {
-			fmt.Printf("    {\"run_id\": %d, \"title\": %q, \"value\": %s}%s\n", v.RunID, v.Title, v.Raw, comma)
+			e.Title = v.Title
+		}
+		runs[i] = e
+	}
+
+	data, err := json.MarshalIndent(statsOutput{Runs: runs, Aggregations: aggs}, "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(data))
+	return nil
+}
+
+func printStatsCSV(values runner.ExtractedValues, aggs map[string]float64) error {
+	w := csv.NewWriter(os.Stdout)
+	defer w.Flush()
+
+	hasLabels := values.HasLabels()
+	var header []string
+	if hasLabels {
+		header = []string{"run_id", "label", "value"}
+	} else {
+		header = []string{"run_id", "title", "value"}
+	}
+	if err := w.Write(header); err != nil {
+		return err
+	}
+	for _, v := range values {
+		desc := v.Title
+		if hasLabels {
+			desc = v.Label
+		}
+		if err := w.Write([]string{strconv.FormatInt(v.RunID, 10), desc, v.Raw}); err != nil {
+			return err
 		}
 	}
-	fmt.Println("  ],")
-	fmt.Println("  \"aggregations\": {")
+
+	// Aggregation summary rows.
 	keys := make([]string, 0, len(aggs))
 	for k := range aggs {
 		keys = append(keys, k)
 	}
-	for i, k := range keys {
-		comma := ","
-		if i == len(keys)-1 {
-			comma = ""
-		}
-		fmt.Printf("    %q: %.2f%s\n", k, aggs[k], comma)
-	}
-	fmt.Println("  }")
-	fmt.Println("}")
-	return nil
-}
-
-func printStatsCSV(values runner.ExtractedValues, _ map[string]float64) error {
-	if values.HasLabels() {
-		fmt.Println("run_id,label,value")
-		for _, v := range values {
-			fmt.Printf("%d,%q,%s\n", v.RunID, v.Label, v.Raw)
-		}
-	} else {
-		fmt.Println("run_id,title,value")
-		for _, v := range values {
-			fmt.Printf("%d,%q,%s\n", v.RunID, v.Title, v.Raw)
+	sort.Strings(keys)
+	for _, k := range keys {
+		if err := w.Write([]string{"", k, strconv.FormatFloat(aggs[k], 'f', -1, 64)}); err != nil {
+			return err
 		}
 	}
 	return nil
