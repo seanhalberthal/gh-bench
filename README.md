@@ -13,12 +13,11 @@
 **Extract CI metrics and surface test failures from GitHub Actions logs.**
 
 [![CI](https://img.shields.io/github/actions/workflow/status/seanhalberthal/gh-bench/release.yml?style=flat&logo=githubactions&logoColor=white&label=CI)](https://github.com/seanhalberthal/gh-bench/actions)
-[![Release](https://img.shields.io/github/v/release/seanhalberthal/gh-bench?style=flat&logo=github&logoColor=white)](https://github.com/seanhalberthal/gh-bench/releases/latest)
+[![Release](https://img.shields.io/github/v/release/seanhalberthal/gh-bench?style=flat&logo=github&logoColor=white&color=D4880F)](https://github.com/seanhalberthal/gh-bench/releases/latest)
+[![gh extension](https://img.shields.io/badge/gh-extension-D4880F?style=flat&logo=gnometerminal&logoColor=white)](https://cli.github.com/manual/gh_extension)
 [![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?style=flat&logo=go&logoColor=white)](https://go.dev)
-[![gh extension](https://img.shields.io/badge/gh-extension-2088FF?style=flat&logo=githubactions&logoColor=white)](https://cli.github.com/manual/gh_extension)
-[![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black)](https://github.com/seanhalberthal/gh-bench/releases)
-[![macOS](https://img.shields.io/badge/macOS-000000?style=flat&logo=apple&logoColor=white)](https://github.com/seanhalberthal/gh-bench/releases)
-[![Windows](https://img.shields.io/badge/Windows-0078D4?style=flat&logo=windows&logoColor=white)](https://github.com/seanhalberthal/gh-bench/releases)
+[![macOS](https://img.shields.io/badge/macOS-6e7681?style=flat&logo=apple&logoColor=white)](https://github.com/seanhalberthal/gh-bench/releases)
+[![Linux](https://img.shields.io/badge/Linux-6e7681?style=flat&logo=linux&logoColor=white)](https://github.com/seanhalberthal/gh-bench/releases)
 
 [Quick Start](#quick-start) · [Commands](#commands) · [Framework Support](#framework-support) · [Configuration](#configuration) · [Examples](#examples)
 
