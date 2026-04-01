@@ -4,23 +4,39 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 )
+
+// localTS converts a UTC RFC 3339 timestamp to the expected local display format.
+func localTS(t *testing.T, utc string) string {
+	t.Helper()
+	parsed, err := time.Parse(time.RFC3339Nano, utc)
+	if err != nil {
+		t.Fatalf("localTS: invalid timestamp %q: %v", utc, err)
+	}
+	return parsed.In(time.Local).Format(timestampFormat)
+}
 
 func TestExtractTimestamp(t *testing.T) {
 	tests := []struct {
 		name string
 		line string
-		want string
+		utc  string // empty means expect ""
 	}{
 		{
 			"standard timestamp",
 			"2026-03-20T12:15:15.1234567Z --- FAIL: TestFoo (0.01s)",
-			"20/03/26 12:15:15",
+			"2026-03-20T12:15:15.1234567Z",
 		},
 		{
 			"short fractional",
 			"2026-01-05T09:30:00.1Z some output",
-			"05/01/26 09:30:00",
+			"2026-01-05T09:30:00.1Z",
+		},
+		{
+			"summer timestamp",
+			"2026-07-15T14:30:00.1234567Z some summer output",
+			"2026-07-15T14:30:00.1234567Z",
 		},
 		{
 			"no timestamp",
@@ -37,8 +53,12 @@ func TestExtractTimestamp(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := extractTimestamp(tt.line)
-			if got != tt.want {
-				t.Errorf("extractTimestamp(%q) = %q, want %q", tt.line, got, tt.want)
+			want := ""
+			if tt.utc != "" {
+				want = localTS(t, tt.utc)
+			}
+			if got != want {
+				t.Errorf("extractTimestamp(%q) = %q, want %q", tt.line, got, want)
 			}
 		})
 	}
@@ -59,11 +79,13 @@ func TestAnnotateTimestamps_GoTest(t *testing.T) {
 
 	AnnotateTimestamps(failures, rawLog)
 
-	if failures[0].Timestamp != "20/03/26 12:15:10" {
-		t.Errorf("failures[0].Timestamp = %q, want %q", failures[0].Timestamp, "20/03/26 12:15:10")
+	wantFoo := localTS(t, "2026-03-20T12:15:10.3456789Z")
+	if failures[0].Timestamp != wantFoo {
+		t.Errorf("failures[0].Timestamp = %q, want %q", failures[0].Timestamp, wantFoo)
 	}
-	if failures[1].Timestamp != "20/03/26 12:15:11" {
-		t.Errorf("failures[1].Timestamp = %q, want %q", failures[1].Timestamp, "20/03/26 12:15:11")
+	wantBar := localTS(t, "2026-03-20T12:15:11.3456789Z")
+	if failures[1].Timestamp != wantBar {
+		t.Errorf("failures[1].Timestamp = %q, want %q", failures[1].Timestamp, wantBar)
 	}
 }
 
@@ -77,8 +99,9 @@ func TestAnnotateTimestamps_Dotnet(t *testing.T) {
 
 	AnnotateTimestamps(failures, rawLog)
 
-	if failures[0].Timestamp != "20/03/26 14:00:00" {
-		t.Errorf("failures[0].Timestamp = %q, want %q", failures[0].Timestamp, "20/03/26 14:00:00")
+	want := localTS(t, "2026-03-20T14:00:00.1234567Z")
+	if failures[0].Timestamp != want {
+		t.Errorf("failures[0].Timestamp = %q, want %q", failures[0].Timestamp, want)
 	}
 }
 
@@ -93,8 +116,9 @@ func TestAnnotateTimestamps_Vitest(t *testing.T) {
 
 	AnnotateTimestamps(failures, rawLog)
 
-	if failures[0].Timestamp != "20/03/26 15:30:01" {
-		t.Errorf("failures[0].Timestamp = %q, want %q", failures[0].Timestamp, "20/03/26 15:30:01")
+	want := localTS(t, "2026-03-20T15:30:01.1234567Z")
+	if failures[0].Timestamp != want {
+		t.Errorf("failures[0].Timestamp = %q, want %q", failures[0].Timestamp, want)
 	}
 }
 
@@ -109,11 +133,13 @@ func TestAnnotateTimestamps_Pytest(t *testing.T) {
 
 	AnnotateTimestamps(failures, rawLog)
 
-	if failures[0].Timestamp != "20/03/26 16:00:00" {
-		t.Errorf("failures[0].Timestamp = %q, want %q", failures[0].Timestamp, "20/03/26 16:00:00")
+	wantLogin := localTS(t, "2026-03-20T16:00:00.1234567Z")
+	if failures[0].Timestamp != wantLogin {
+		t.Errorf("failures[0].Timestamp = %q, want %q", failures[0].Timestamp, wantLogin)
 	}
-	if failures[1].Timestamp != "20/03/26 16:00:01" {
-		t.Errorf("failures[1].Timestamp = %q, want %q", failures[1].Timestamp, "20/03/26 16:00:01")
+	wantSignup := localTS(t, "2026-03-20T16:00:01.1234567Z")
+	if failures[1].Timestamp != wantSignup {
+		t.Errorf("failures[1].Timestamp = %q, want %q", failures[1].Timestamp, wantSignup)
 	}
 }
 
@@ -182,6 +208,50 @@ func TestAnnotateTimestamps_Vitest_RoundTrip(t *testing.T) {
 		if f.Timestamp == "" {
 			t.Errorf("failures[%d] (%q) has empty timestamp after round-trip annotation", i, f.TestName)
 		}
+	}
+}
+
+func TestExtractTimestamp_LocalConversion(t *testing.T) {
+	tests := []struct {
+		name string
+		line string
+		utc  string
+	}{
+		{
+			"summer date",
+			"2026-07-15T14:30:00.1234567Z test output",
+			"2026-07-15T14:30:00.1234567Z",
+		},
+		{
+			"winter date",
+			"2026-12-01T14:30:00.1234567Z test output",
+			"2026-12-01T14:30:00.1234567Z",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractTimestamp(tt.line)
+			want := localTS(t, tt.utc)
+			if got != want {
+				t.Errorf("extractTimestamp(%q) = %q, want %q", tt.line, got, want)
+			}
+		})
+	}
+}
+
+func TestAnnotateTimestamps_LocalConversion(t *testing.T) {
+	rawLog := "2026-07-15T14:00:00.1234567Z --- FAIL: TestSummer (0.01s)\n"
+
+	failures := []Failure{
+		{TestName: "TestSummer", Framework: "go test"},
+	}
+
+	AnnotateTimestamps(failures, rawLog)
+
+	want := localTS(t, "2026-07-15T14:00:00.1234567Z")
+	if failures[0].Timestamp != want {
+		t.Errorf("failures[0].Timestamp = %q, want %q", failures[0].Timestamp, want)
 	}
 }
 

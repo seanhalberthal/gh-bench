@@ -38,7 +38,6 @@ func (s *stubExecutor) Run(args ...string) (string, error) {
 	return "", fmt.Errorf("no handler for: %s", key)
 }
 
-
 func TestFetchLogs_WithRunIDs(t *testing.T) {
 	stub := newStubExecutor()
 	stub.handlers["run view 100 --json displayTitle"] = "run alpha\t2025-03-20T10:00:00Z\tmain"

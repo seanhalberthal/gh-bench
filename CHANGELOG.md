@@ -7,6 +7,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- `grep` subcommand for searching CI run logs by keyword or regex
+
+### Changed
+- Failure timestamps now use the system's local timezone instead of hardcoded Europe/London
+
+### Fixed
+- Struct conversion used instead of literal for staticcheck S1016
+
+## [0.1.9]
+
+### Added
 - Failure timestamps — `failures` output now includes the timestamp when each test failure occurred, extracted from raw CI log lines
 - `--version` / `-v` flag on the root command to print the current version
 - New `internal/logutil` package consolidating shared timestamp-stripping logic

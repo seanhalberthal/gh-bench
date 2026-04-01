@@ -10,22 +10,22 @@ import (
 var tsExtractRe = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z)\s`)
 
 // timestampFormat is the human-readable display format for failure timestamps.
-const timestampFormat = "02/01/06 15:04:05"
+// The MST verb outputs the local timezone abbreviation.
+const timestampFormat = "02/01/06 15:04:05 MST"
 
 // extractTimestamp returns the formatted timestamp from a raw log line, or "".
+// Timestamps are converted from UTC to the system's local timezone.
 func extractTimestamp(line string) string {
 	m := tsExtractRe.FindStringSubmatch(line)
 	if m == nil {
 		return ""
 	}
-	// Truncate fractional seconds to 9 digits max for time.Parse compatibility,
-	// then parse with a fixed-length nanosecond reference.
 	raw := m[1]
 	t, err := time.Parse(time.RFC3339Nano, raw)
 	if err != nil {
 		return ""
 	}
-	return t.Format(timestampFormat)
+	return t.In(time.Local).Format(timestampFormat)
 }
 
 // AnnotateTimestamps sets the Timestamp field on each failure by matching
