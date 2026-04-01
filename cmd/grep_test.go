@@ -227,9 +227,9 @@ func TestGrepResult_TextWithStep(t *testing.T) {
 func TestGrepResult_TextWithContext(t *testing.T) {
 	results := []grepResult{
 		{
-			RunID:  100,
-			Title:  "Build",
-			Date:   "2026-01-01",
+			RunID: 100,
+			Title: "Build",
+			Date:  "2026-01-01",
 			Matches: []grepMatch{
 				{
 					Line:    5,

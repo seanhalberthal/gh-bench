@@ -222,7 +222,7 @@ func printGrepText(results []grepResult, totalMatches, totalRuns int) error {
 
 		for _, m := range r.Matches {
 			if m.Context != "" {
-				for _, cl := range strings.Split(m.Context, "\n") {
+				for cl := range strings.SplitSeq(m.Context, "\n") {
 					fmt.Fprintf(&b, "  %s\n", cl)
 				}
 				b.WriteByte('\n')
