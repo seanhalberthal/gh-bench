@@ -255,7 +255,7 @@ func printGrepJSON(results []grepResult) error {
 	for i, r := range results {
 		matches := make([]matchOutput, len(r.Matches))
 		for j, m := range r.Matches {
-			matches[j] = matchOutput{Line: m.Line, Content: m.Content, Context: m.Context}
+			matches[j] = matchOutput(m)
 		}
 		output[i] = runOutput{
 			RunID:   r.RunID,
