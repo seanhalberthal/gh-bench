@@ -4,28 +4,43 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	_ "time/tzdata" // Embed timezone database for environments without system tz data
 )
 
 // tsExtractRe captures the ISO 8601 timestamp at the start of a GitHub Actions log line.
 var tsExtractRe = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z)\s`)
 
 // timestampFormat is the human-readable display format for failure timestamps.
-const timestampFormat = "02/01/06 15:04:05"
+// The MST verb outputs the timezone abbreviation (GMT or BST for Europe/London).
+const timestampFormat = "02/01/06 15:04:05 MST"
+
+// londonLocation is the Europe/London timezone for converting UTC timestamps
+// to UK local time (GMT in winter, BST in summer).
+var londonLocation *time.Location
+
+func init() {
+	var err error
+	londonLocation, err = time.LoadLocation("Europe/London")
+	if err != nil {
+		// This should never happen with embedded tzdata, but fall back to UTC
+		// rather than panicking so the tool remains usable.
+		londonLocation = time.UTC
+	}
+}
 
 // extractTimestamp returns the formatted timestamp from a raw log line, or "".
+// Timestamps are converted from UTC to UK local time (GMT/BST).
 func extractTimestamp(line string) string {
 	m := tsExtractRe.FindStringSubmatch(line)
 	if m == nil {
 		return ""
 	}
-	// Truncate fractional seconds to 9 digits max for time.Parse compatibility,
-	// then parse with a fixed-length nanosecond reference.
 	raw := m[1]
 	t, err := time.Parse(time.RFC3339Nano, raw)
 	if err != nil {
 		return ""
 	}
-	return t.Format(timestampFormat)
+	return t.In(londonLocation).Format(timestampFormat)
 }
 
 // AnnotateTimestamps sets the Timestamp field on each failure by matching
