@@ -37,6 +37,7 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(statsCmd)
 	rootCmd.AddCommand(failuresCmd)
+	rootCmd.AddCommand(grepCmd)
 
 	rootCmd.PersistentFlags().StringP("format", "f", "table", "Output format: table, json, csv")
 	rootCmd.PersistentFlags().Bool("json", false, "Output as JSON (shorthand for --format json)")
