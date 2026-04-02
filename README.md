@@ -77,6 +77,8 @@ Fetch failed CI runs, identify failing steps, and extract structured errors usin
 
 By default, only runs from branches with **open pull requests** are shown — keeping the output focused on actionable failures. Use `--all` to include all failed runs, or `--branch` to target a specific branch.
 
+When a run has been **re-run** (multiple attempts), only the latest attempt's failures are shown. Steps from re-runs are annotated with the attempt number — e.g. `Step: Run tests (attempt 2)`.
+
 ```bash
 gh bench failures --workflow ci.yml
 gh bench failures -w ci.yml --all

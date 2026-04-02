@@ -183,6 +183,15 @@ func runFailures(cmd *cobra.Command, args []string) error {
 	}
 }
 
+// stepLabel returns the step name annotated with the attempt number when
+// the step came from a re-run (attempt > 1).
+func (s enrichedStep) stepLabel() string {
+	if s.Attempt > 1 {
+		return fmt.Sprintf("%s (attempt %d)", s.Name, s.Attempt)
+	}
+	return s.Name
+}
+
 func printFailuresJSON(enriched []enrichedRun) error {
 	type failureOutput struct {
 		RunID     int64            `json:"run_id"`
@@ -190,6 +199,7 @@ func printFailuresJSON(enriched []enrichedRun) error {
 		Date      string           `json:"date"`
 		Branch    string           `json:"branch"`
 		Step      string           `json:"step"`
+		Attempt   int              `json:"attempt,omitempty"`
 		Framework string           `json:"framework"`
 		Failures  []parser.Failure `json:"failures"`
 	}
@@ -203,6 +213,7 @@ func printFailuresJSON(enriched []enrichedRun) error {
 				Date:      r.Date,
 				Branch:    r.Branch,
 				Step:      step.Name,
+				Attempt:   step.Attempt,
 				Framework: step.Framework,
 				Failures:  step.Failures,
 			})
@@ -221,7 +232,7 @@ func printFailuresCSV(enriched []enrichedRun) error {
 	w := csv.NewWriter(os.Stdout)
 	defer w.Flush()
 
-	if err := w.Write([]string{"run_id", "title", "date", "branch", "step", "framework", "test_name", "message", "location", "timestamp"}); err != nil {
+	if err := w.Write([]string{"run_id", "title", "date", "branch", "step", "attempt", "framework", "test_name", "message", "location", "timestamp"}); err != nil {
 		return err
 	}
 	for _, r := range enriched {
@@ -229,7 +240,7 @@ func printFailuresCSV(enriched []enrichedRun) error {
 			for _, f := range step.Failures {
 				if err := w.Write([]string{
 					strconv.FormatInt(r.RunID, 10), r.Title, r.Date, r.Branch, step.Name,
-					step.Framework, f.TestName, f.Message, f.Location, f.Timestamp,
+					strconv.Itoa(step.Attempt), step.Framework, f.TestName, f.Message, f.Location, f.Timestamp,
 				}); err != nil {
 					return err
 				}
@@ -253,7 +264,7 @@ func printFailuresText(enriched []enrichedRun) error {
 			} else {
 				fmt.Fprintf(&b, "● RUN %d — %s (%s)\n", r.RunID, r.Title, r.Date)
 			}
-			fmt.Fprintf(&b, "  Step: %s\n", step.Name)
+			fmt.Fprintf(&b, "  Step: %s\n", step.stepLabel())
 			fmt.Fprintf(&b, "  Framework: %s\n\n", step.Framework)
 
 			if len(step.Failures) == 0 {

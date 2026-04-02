@@ -37,7 +37,7 @@ Global `--json` flag on root command switches output format.
 - `ListRuns()` queries workflow runs returning IDs and branch names (used for open-PR filtering)
 - `ListOpenPRBranches()` returns the set of branches with open pull requests
 - All log paths strip GitHub Actions `job\tstep\t` tab prefixes and ISO 8601 timestamps via `stripLogPrefixes()` (delegates to `logutil.StripTimestamp`)
-- `GetFailedSteps()` parses job/step JSON to isolate failed step logs
+- `GetFailedSteps()` fetches jobs across all run attempts via the REST API (`filter=all`), deduplicates by job name keeping only the latest attempt, and isolates failed step logs. Falls back to `gh run view --json jobs` when the REST API is unavailable. `StepResult.Attempt` carries the attempt number for display.
 - `ExtractValues()` applies regex with named capture groups to extract numeric values; supports optional `(?P<label>...)` group for row-level context
 
 **`internal/parser/`** — Framework-specific test failure parsers
