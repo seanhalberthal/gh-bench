@@ -49,9 +49,10 @@ type RunResult struct {
 
 // StepResult holds the output for a single failing step.
 type StepResult struct {
-	Name   string
-	Log    string
-	RawLog string // Timestamp-preserved, tab-prefix-stripped version
+	Name    string
+	Log     string
+	RawLog  string // Timestamp-preserved, tab-prefix-stripped version
+	Attempt int    // Run attempt number; 0 or 1 means first/only attempt
 }
 
 // GHExecutor abstracts gh CLI execution for testing.

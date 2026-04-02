@@ -418,3 +418,124 @@ func TestShouldSkipStep(t *testing.T) {
 		}
 	}
 }
+
+func TestDeduplicateByLatestAttempt(t *testing.T) {
+	jobs := []apiJob{
+		{ID: 1, Name: "test", RunAttempt: 1, Conclusion: "failure"},
+		{ID: 2, Name: "test", RunAttempt: 2, Conclusion: "failure"},
+		{ID: 3, Name: "build", RunAttempt: 1, Conclusion: "success"},
+	}
+
+	got := deduplicateByLatestAttempt(jobs)
+
+	byName := make(map[string]jobInfo, len(got))
+	for _, j := range got {
+		byName[j.Name] = j
+	}
+
+	if len(byName) != 2 {
+		t.Fatalf("expected 2 unique jobs, got %d", len(byName))
+	}
+	if byName["test"].DatabaseID != 2 {
+		t.Errorf("test job: got databaseId %d, want 2 (latest attempt)", byName["test"].DatabaseID)
+	}
+	if byName["test"].Attempt != 2 {
+		t.Errorf("test job: got attempt %d, want 2", byName["test"].Attempt)
+	}
+	if byName["build"].DatabaseID != 3 {
+		t.Errorf("build job: got databaseId %d, want 3", byName["build"].DatabaseID)
+	}
+}
+
+func TestDeduplicateByLatestAttempt_SingleAttempt(t *testing.T) {
+	jobs := []apiJob{
+		{ID: 10, Name: "lint", RunAttempt: 1, Conclusion: "failure"},
+	}
+	got := deduplicateByLatestAttempt(jobs)
+	if len(got) != 1 || got[0].DatabaseID != 10 || got[0].Attempt != 1 {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestGetFailedSteps_MultipleAttempts(t *testing.T) {
+	stub := newStubExecutor()
+	// REST API returns jobs from both attempt 1 and attempt 2 for the same job name.
+	// Attempt 1 failed; attempt 2 also failed (re-run). Only attempt 2 should surface.
+	stub.handlers["api repos/{owner}/{repo}/actions/runs/100/jobs"] = `{
+		"jobs": [
+			{
+				"id": 1001,
+				"name": "test",
+				"status": "completed",
+				"conclusion": "failure",
+				"run_attempt": 1,
+				"steps": [
+					{"name": "Run tests", "status": "completed", "conclusion": "failure", "number": 1}
+				]
+			},
+			{
+				"id": 1002,
+				"name": "test",
+				"status": "completed",
+				"conclusion": "failure",
+				"run_attempt": 2,
+				"steps": [
+					{"name": "Run tests", "status": "completed", "conclusion": "failure", "number": 1}
+				]
+			}
+		]
+	}`
+	stub.handlers["api repos/{owner}/{repo}/actions/jobs/1002/logs"] = "FAIL: TestBar\nerror on attempt 2"
+
+	orig := Executor
+	Executor = stub
+	defer func() { Executor = orig }()
+
+	steps, err := GetFailedSteps(context.Background(), 100)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(steps) != 1 {
+		t.Fatalf("expected 1 step (latest attempt only), got %d", len(steps))
+	}
+	if steps[0].Attempt != 2 {
+		t.Errorf("expected Attempt=2, got %d", steps[0].Attempt)
+	}
+	if !strings.Contains(steps[0].Log, "error on attempt 2") {
+		t.Errorf("expected log from attempt 2, got: %q", steps[0].Log)
+	}
+}
+
+func TestGetFailedSteps_AttemptAnnotatedOnFirstAttempt(t *testing.T) {
+	stub := newStubExecutor()
+	stub.handlers["api repos/{owner}/{repo}/actions/runs/200/jobs"] = `{
+		"jobs": [
+			{
+				"id": 2001,
+				"name": "test",
+				"status": "completed",
+				"conclusion": "failure",
+				"run_attempt": 1,
+				"steps": [
+					{"name": "Run tests", "status": "completed", "conclusion": "failure", "number": 1}
+				]
+			}
+		]
+	}`
+	stub.handlers["api repos/{owner}/{repo}/actions/jobs/2001/logs"] = "FAIL: TestFoo"
+
+	orig := Executor
+	Executor = stub
+	defer func() { Executor = orig }()
+
+	steps, err := GetFailedSteps(context.Background(), 200)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(steps) != 1 {
+		t.Fatalf("expected 1 step, got %d", len(steps))
+	}
+	if steps[0].Attempt != 1 {
+		t.Errorf("expected Attempt=1, got %d", steps[0].Attempt)
+	}
+}

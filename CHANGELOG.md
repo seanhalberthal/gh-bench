@@ -11,9 +11,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 - Failure timestamps now use the system's local timezone instead of hardcoded Europe/London
+- `GetFailedSteps` decomposed into focused helpers (`collectFailedJobSteps`, `failedStepsFor`, `fetchJobLogsParallel`, `assembleStepResults`, `fetchJobsFromAPI`, `deduplicateByLatestAttempt`, `fetchJobsFromRunView`) to reduce cyclomatic complexity
 
 ### Fixed
 - Struct conversion used instead of literal for staticcheck S1016
+- `failures` command now correctly surfaces jobs from re-run attempts — previously, jobs that failed in an earlier attempt and weren't re-run were silently dropped. The REST API is now queried with `filter=all` and deduplicated by job name keeping the latest attempt. Steps from re-runs are annotated with the attempt number (e.g. `Run tests (attempt 2)`)
 
 ## [0.1.9]
 

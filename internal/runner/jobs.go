@@ -20,6 +20,36 @@ type Job struct {
 	Steps      []Step `json:"steps"`
 }
 
+// Step represents a GitHub Actions job step.
+type Step struct {
+	Name       string `json:"name"`
+	Status     string `json:"status"`
+	Conclusion string `json:"conclusion"`
+	Number     int    `json:"number"`
+}
+
+// jobInfo pairs a Job with the run attempt it came from.
+type jobInfo struct {
+	Job
+	Attempt int
+}
+
+// apiJob is the REST API representation of a job, including run_attempt.
+type apiJob struct {
+	ID         int64  `json:"id"`
+	Name       string `json:"name"`
+	Status     string `json:"status"`
+	Conclusion string `json:"conclusion"`
+	RunAttempt int    `json:"run_attempt"`
+	Steps      []Step `json:"steps"`
+}
+
+// jobSteps pairs a jobInfo with its failed steps.
+type jobSteps struct {
+	info  jobInfo
+	steps []Step
+}
+
 // skipStepNames are GitHub Actions infrastructure steps that never contain test output.
 var skipStepNames = []string{
 	"Set up job",
@@ -40,91 +70,155 @@ func shouldSkipStep(name string) bool {
 	return false
 }
 
-// Step represents a GitHub Actions job step.
-type Step struct {
-	Name       string `json:"name"`
-	Status     string `json:"status"`
-	Conclusion string `json:"conclusion"`
-	Number     int    `json:"number"`
-}
-
 // GetFailedSteps retrieves the failed steps for a workflow run and fetches their logs.
 func GetFailedSteps(ctx context.Context, runID int64) ([]StepResult, error) {
-	idStr := strconv.FormatInt(runID, 10)
-
-	out, err := Executor.Run("run", "view", idStr, "--json", "jobs")
+	jobs, err := getJobsForRun(strconv.FormatInt(runID, 10))
 	if err != nil {
 		return nil, fmt.Errorf("fetching jobs: %w", err)
 	}
 
+	toFetch := collectFailedJobSteps(jobs)
+	if len(toFetch) == 0 {
+		return nil, nil
+	}
+
+	logs, err := fetchJobLogsParallel(ctx, toFetch, runID)
+	if err != nil {
+		return nil, err
+	}
+
+	return assembleStepResults(toFetch, logs), nil
+}
+
+// collectFailedJobSteps filters the job list down to jobs with failed steps,
+// returning each job paired with its relevant failed steps.
+func collectFailedJobSteps(jobs []jobInfo) []jobSteps {
+	var out []jobSteps
+	for _, info := range jobs {
+		if info.Conclusion != "failure" && info.Conclusion != "cancelled" {
+			continue
+		}
+		if failed := failedStepsFor(info.Steps); len(failed) > 0 {
+			out = append(out, jobSteps{info: info, steps: failed})
+		}
+	}
+	return out
+}
+
+// failedStepsFor returns the non-infrastructure steps with a failure conclusion.
+func failedStepsFor(steps []Step) []Step {
+	var out []Step
+	for _, s := range steps {
+		if s.Conclusion == "failure" && !shouldSkipStep(s.Name) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// fetchJobLogsParallel fetches logs for each job in toFetch concurrently.
+func fetchJobLogsParallel(ctx context.Context, toFetch []jobSteps, runID int64) ([]logPair, error) {
+	logs := make([]logPair, len(toFetch))
+	g, ctx := errgroup.WithContext(ctx)
+	for i, js := range toFetch {
+		g.Go(func() error {
+			lp, err := fetchJobLog(ctx, js.info.DatabaseID, runID)
+			if err != nil {
+				return fmt.Errorf("fetching log for job %d: %w", js.info.DatabaseID, err)
+			}
+			logs[i] = lp
+			return nil
+		})
+	}
+	return logs, g.Wait()
+}
+
+// assembleStepResults builds StepResult values from fetched logs,
+// segmenting by step name when group markers are present.
+func assembleStepResults(toFetch []jobSteps, logs []logPair) []StepResult {
+	var out []StepResult
+	for i, js := range toFetch {
+		for _, step := range js.steps {
+			out = append(out, StepResult{
+				Name:    step.Name,
+				Log:     segmentByStep(logs[i].clean, step.Name),
+				RawLog:  segmentByStep(logs[i].raw, step.Name),
+				Attempt: js.info.Attempt,
+			})
+		}
+	}
+	return out
+}
+
+// getJobsForRun fetches jobs for a run using the REST API with filter=all so
+// that jobs from all re-run attempts are visible. It deduplicates by job name,
+// keeping only the result from the latest attempt for each job. Falls back to
+// gh run view when the REST API is unavailable.
+func getJobsForRun(runID string) ([]jobInfo, error) {
+	if jobs, err := fetchJobsFromAPI(runID); err == nil {
+		return deduplicateByLatestAttempt(jobs), nil
+	}
+	return fetchJobsFromRunView(runID)
+}
+
+// fetchJobsFromAPI calls the REST API for all jobs across all attempts.
+func fetchJobsFromAPI(runID string) ([]apiJob, error) {
+	out, err := Executor.Run("api",
+		"repos/{owner}/{repo}/actions/runs/"+runID+"/jobs?filter=all&per_page=100")
+	if err != nil {
+		return nil, err
+	}
+	var result struct {
+		Jobs []apiJob `json:"jobs"`
+	}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		return nil, err
+	}
+	return result.Jobs, nil
+}
+
+// deduplicateByLatestAttempt keeps only the highest-attempt result for each job name.
+func deduplicateByLatestAttempt(jobs []apiJob) []jobInfo {
+	latest := make(map[string]apiJob, len(jobs))
+	for _, rj := range jobs {
+		if existing, ok := latest[rj.Name]; !ok || rj.RunAttempt > existing.RunAttempt {
+			latest[rj.Name] = rj
+		}
+	}
+	out := make([]jobInfo, 0, len(latest))
+	for _, rj := range latest {
+		out = append(out, jobInfo{
+			Job: Job{
+				DatabaseID: rj.ID,
+				Name:       rj.Name,
+				Status:     rj.Status,
+				Conclusion: rj.Conclusion,
+				Steps:      rj.Steps,
+			},
+			Attempt: rj.RunAttempt,
+		})
+	}
+	return out
+}
+
+// fetchJobsFromRunView falls back to gh run view, which returns only the latest
+// attempt's jobs and carries no attempt metadata.
+func fetchJobsFromRunView(runID string) ([]jobInfo, error) {
+	out, err := Executor.Run("run", "view", runID, "--json", "jobs")
+	if err != nil {
+		return nil, err
+	}
 	var result struct {
 		Jobs []Job `json:"jobs"`
 	}
 	if err := json.Unmarshal([]byte(out), &result); err != nil {
 		return nil, fmt.Errorf("parsing jobs JSON: %w", err)
 	}
-
-	// Collect failed/cancelled jobs that need log fetches.
-	type jobSteps struct {
-		job   Job
-		steps []Step
+	infos := make([]jobInfo, len(result.Jobs))
+	for i, j := range result.Jobs {
+		infos[i] = jobInfo{Job: j}
 	}
-	var toFetch []jobSteps
-	for _, job := range result.Jobs {
-		if job.Conclusion != "failure" && job.Conclusion != "cancelled" {
-			continue
-		}
-		var failed []Step
-		for _, step := range job.Steps {
-			if step.Conclusion != "failure" {
-				continue
-			}
-			if shouldSkipStep(step.Name) {
-				continue
-			}
-			failed = append(failed, step)
-		}
-		if len(failed) > 0 {
-			toFetch = append(toFetch, jobSteps{job: job, steps: failed})
-		}
-	}
-
-	if len(toFetch) == 0 {
-		return nil, nil
-	}
-
-	// Fetch job logs in parallel.
-	logs := make([]logPair, len(toFetch))
-	g, ctx := errgroup.WithContext(ctx)
-	for i, js := range toFetch {
-		g.Go(func() error {
-			lp, err := fetchJobLog(ctx, js.job.DatabaseID, runID)
-			if err != nil {
-				return fmt.Errorf("fetching log for job %d: %w", js.job.DatabaseID, err)
-			}
-			logs[i] = lp
-			return nil
-		})
-	}
-	if err := g.Wait(); err != nil {
-		return nil, err
-	}
-
-	// Assemble step results, segmenting logs by step when markers are present.
-	var failedSteps []StepResult
-	for i, js := range toFetch {
-		for _, step := range js.steps {
-			clean := segmentByStep(logs[i].clean, step.Name)
-			raw := segmentByStep(logs[i].raw, step.Name)
-			failedSteps = append(failedSteps, StepResult{
-				Name:   step.Name,
-				Log:    clean,
-				RawLog: raw,
-			})
-		}
-	}
-
-	return failedSteps, nil
+	return infos, nil
 }
 
 // segmentByStep extracts the log section for a specific step using
@@ -208,18 +302,18 @@ func stripLogPrefixes(log string) string {
 			b.WriteByte('\n')
 		}
 
-		first := strings.IndexByte(line, '\t')
-		if first < 0 {
+		_, after, ok := strings.Cut(line, "\t")
+		if !ok {
 			b.WriteString(logutil.StripTimestamp(line))
 			continue
 		}
-		rest := line[first+1:]
-		second := strings.IndexByte(rest, '\t')
-		if second < 0 {
+		rest := after
+		_, after, ok = strings.Cut(rest, "\t")
+		if !ok {
 			b.WriteString(logutil.StripTimestamp(line))
 			continue
 		}
-		b.WriteString(logutil.StripTimestamp(rest[second+1:]))
+		b.WriteString(logutil.StripTimestamp(after))
 	}
 
 	return b.String()
@@ -236,18 +330,18 @@ func stripTabPrefixesOnly(log string) string {
 			b.WriteByte('\n')
 		}
 
-		first := strings.IndexByte(line, '\t')
-		if first < 0 {
+		_, after, ok := strings.Cut(line, "\t")
+		if !ok {
 			b.WriteString(line)
 			continue
 		}
-		rest := line[first+1:]
-		second := strings.IndexByte(rest, '\t')
-		if second < 0 {
+		rest := after
+		_, after, ok = strings.Cut(rest, "\t")
+		if !ok {
 			b.WriteString(line)
 			continue
 		}
-		b.WriteString(rest[second+1:])
+		b.WriteString(after)
 	}
 
 	return b.String()
