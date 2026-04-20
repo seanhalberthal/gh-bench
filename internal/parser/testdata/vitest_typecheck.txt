@@ -1,0 +1,18 @@
+ ✖ TypeScript typecheck via `tsc` failed.
+To ignore failing typecheck, use `--typecheck=disable`.
+- Collecting TypeScript errors
+convex/beds.test.ts:7:29 - error TS2339: Property 'glob' does not exist on type 'ImportMeta'.
+
+7 const modules = import.meta.glob('./**/*.*s');
+                              ~~~~
+
+convex/memberships.test.ts:7:29 - error TS2339: Property 'glob' does not exist on type 'ImportMeta'.
+
+7 const modules = import.meta.glob('./**/*.*s');
+                              ~~~~
+
+Found 2 errors in 2 files.
+
+Errors  Files
+  1  convex/beds.test.ts:7
+  1  convex/memberships.test.ts:7
