@@ -92,6 +92,24 @@ func TestDetectFramework_Vitest(t *testing.T) {
 	}
 }
 
+func TestParse_VitestTypecheckDetected(t *testing.T) {
+	logs := readTestData(t, "vitest_typecheck.txt")
+	failures := Parse(logs)
+	if len(failures) == 0 {
+		t.Fatal("expected failures to be extracted from vitest typecheck logs")
+	}
+	if failures[0].Framework != "Vitest" {
+		t.Errorf("expected framework 'Vitest', got %q", failures[0].Framework)
+	}
+}
+
+func TestDetectFramework_VitestTypecheck(t *testing.T) {
+	logs := readTestData(t, "vitest_typecheck.txt")
+	if fw := DetectFramework(logs); fw != "Vitest" {
+		t.Errorf("expected 'Vitest', got %q", fw)
+	}
+}
+
 func TestDetectFramework_Unknown(t *testing.T) {
 	if fw := DetectFramework("random text"); fw != "unknown" {
 		t.Errorf("expected 'unknown', got %q", fw)

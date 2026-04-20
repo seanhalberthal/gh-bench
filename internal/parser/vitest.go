@@ -20,6 +20,10 @@ var (
 	vitestLocationRe = regexp.MustCompile(`at\s+(\S+\.\w+:\d+:\d+)`)
 	// Matches: "expected 'X' to equal 'Y'"
 	vitestExpectedRe = regexp.MustCompile(`^\s+(expected\s+.+)$`)
+	// Matches vitest's --typecheck banner or the disable hint it prints on failure.
+	vitestTypecheckRe = regexp.MustCompile("TypeScript typecheck via|--typecheck=disable")
+	// Matches a tsc diagnostic line: "path/to/file.ts:7:29 - error TS2339: message"
+	vitestTscErrorRe = regexp.MustCompile(`^(\S+\.\w+):(\d+):(\d+)\s+-\s+error\s+(TS\d+):\s+(.+)$`)
 )
 
 // Name returns the parser name.
@@ -27,7 +31,9 @@ func (v *VitestParser) Name() string { return "Vitest" }
 
 // Detect checks if the log contains Vitest/Jest failure patterns.
 func (v *VitestParser) Detect(logs string) bool {
-	return vitestFileFailRe.MatchString(logs) || vitestTestFailRe.MatchString(logs)
+	return vitestFileFailRe.MatchString(logs) ||
+		vitestTestFailRe.MatchString(logs) ||
+		vitestTypecheckRe.MatchString(logs)
 }
 
 // Extract parses Vitest/Jest failures from logs.
@@ -77,5 +83,32 @@ func (v *VitestParser) Extract(logs string) []Failure {
 		failures = append(failures, f)
 	}
 
+	// If the normal runtime-failure extraction came up empty but the log
+	// looks like vitest's --typecheck mode, fall back to extracting tsc
+	// diagnostics as individual failures.
+	if len(failures) == 0 && vitestTypecheckRe.MatchString(logs) {
+		failures = extractVitestTypecheckFailures(lines)
+	}
+
+	return failures
+}
+
+// extractVitestTypecheckFailures parses tsc diagnostic lines emitted by
+// vitest when running in --typecheck mode.
+func extractVitestTypecheckFailures(lines []string) []Failure {
+	var failures []Failure
+	for _, line := range lines {
+		m := vitestTscErrorRe.FindStringSubmatch(line)
+		if m == nil {
+			continue
+		}
+		loc := m[1] + ":" + m[2] + ":" + m[3]
+		failures = append(failures, Failure{
+			TestName:  loc,
+			Location:  loc,
+			Message:   m[4] + ": " + strings.TrimSpace(m[5]),
+			Framework: "Vitest",
+		})
+	}
 	return failures
 }

@@ -112,7 +112,7 @@ The `failures` command auto-detects the test framework from log output and extra
 |-----------|-----------|------------------|
 | **.NET** (xUnit, NUnit, MSTest) | `Failed TestName [duration]`, `error CS*:`, summary lines | Test name, duration, exception, assertion, stack trace location |
 | **Go** | `--- FAIL: TestName (duration)`, `FAIL\tpackage` | Test name, duration, error message, file:line |
-| **Vitest** / Jest | `✗ Suite > Test`, `FAIL *.test.tsx` | Test name, error type, expected/actual, file:line:col |
+| **Vitest** / Jest | `✗ Suite > Test`, `FAIL *.test.tsx`, or tsc diagnostics when running `--typecheck` | Test name, error type, expected/actual, file:line:col |
 | **Fallback** | No framework detected | Last 30 non-boilerplate lines, `##[error]` messages |
 
 The fallback parser strips GitHub Actions boilerplate (env vars, annotations, cleanup lines, shell script source) and prioritises `##[error]` messages.
