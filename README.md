@@ -25,7 +25,7 @@
 
 ---
 
-A [`gh`](https://cli.github.com) CLI extension that pulls numeric values from CI run logs for benchmarking and aggregates stats (median, mean, p95), and extracts structured test failures with framework-aware parsers.
+A [`gh`](https://cli.github.com) CLI extension. `gh bench stats` pulls numeric values from CI logs and aggregates them (median, mean, p95). `gh bench failures` extracts structured test failures using framework-aware parsers.
 
 ## Quick Start
 
@@ -75,9 +75,9 @@ Either `--pattern` or `--preset` is required. Either `--workflow` or `--runs` is
 
 Fetch failed CI runs, identify failing steps, and extract structured errors using framework-aware parsers. Each failure is annotated with the timestamp from the raw CI log, so you can see exactly when it occurred.
 
-By default, only runs from branches with **open pull requests** are shown — keeping the output focused on actionable failures. Use `--all` to include all failed runs, or `--branch` to target a specific branch.
+By default, only runs from branches with **open pull requests** are shown. Use `--all` to include all failed runs, or `--branch` to target a specific branch.
 
-When a run has been **re-run** (multiple attempts), only the latest attempt's failures are shown. Steps from re-runs are annotated with the attempt number — e.g. `Step: Run tests (attempt 2)`.
+When a run has been **re-run** (multiple attempts), only the latest attempt's failures are shown. Steps from re-runs are annotated with the attempt number, e.g. `Step: Run tests (attempt 2)`.
 
 ```bash
 gh bench failures --workflow ci.yml
