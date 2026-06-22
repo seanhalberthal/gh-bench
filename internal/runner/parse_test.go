@@ -445,17 +445,17 @@ func TestPresets_RealWorldLogs(t *testing.T) {
 		{
 			preset: "go-test",
 			log: "=== RUN   TestAudit\n--- PASS: TestAudit (0.02s)\n" +
-				"ok  \tgithub.com/seanhalberthal/supplyscan/internal/audit\t1.047s\n" +
-				"ok  \tgithub.com/seanhalberthal/supplyscan/internal/cli\t1.049s\n" +
-				"ok  \tgithub.com/seanhalberthal/supplyscan/internal/lockfile\t1.027s\n" +
-				"ok  \tgithub.com/seanhalberthal/supplyscan/internal/scanner\t166.754s",
+				"ok  \tgithub.com/undont/supplyscan/internal/audit\t1.047s\n" +
+				"ok  \tgithub.com/undont/supplyscan/internal/cli\t1.049s\n" +
+				"ok  \tgithub.com/undont/supplyscan/internal/lockfile\t1.027s\n" +
+				"ok  \tgithub.com/undont/supplyscan/internal/scanner\t166.754s",
 			matchAll: true,
 			want:     []float64{1.047, 1.049, 1.027, 166.754},
 			labels: []string{
-				"github.com/seanhalberthal/supplyscan/internal/audit",
-				"github.com/seanhalberthal/supplyscan/internal/cli",
-				"github.com/seanhalberthal/supplyscan/internal/lockfile",
-				"github.com/seanhalberthal/supplyscan/internal/scanner",
+				"github.com/undont/supplyscan/internal/audit",
+				"github.com/undont/supplyscan/internal/cli",
+				"github.com/undont/supplyscan/internal/lockfile",
+				"github.com/undont/supplyscan/internal/scanner",
 			},
 		},
 		// go-test: single package
@@ -586,9 +586,9 @@ func TestPresets_WithRawGitHubActionsLogs(t *testing.T) {
 	}{
 		{
 			preset: "go-test",
-			rawLog: "test\tUNKNOWN STEP\t2026-03-16T13:34:37.3465175Z ok  \tgithub.com/seanhalberthal/supplyscan/internal/audit\t1.047s\n" +
-				"test\tUNKNOWN STEP\t2026-03-16T13:34:37.3558618Z ok  \tgithub.com/seanhalberthal/supplyscan/internal/cli\t1.049s\n" +
-				"test\tUNKNOWN STEP\t2026-03-16T13:37:24.1037868Z ok  \tgithub.com/seanhalberthal/supplyscan/internal/scanner\t166.754s",
+			rawLog: "test\tUNKNOWN STEP\t2026-03-16T13:34:37.3465175Z ok  \tgithub.com/undont/supplyscan/internal/audit\t1.047s\n" +
+				"test\tUNKNOWN STEP\t2026-03-16T13:34:37.3558618Z ok  \tgithub.com/undont/supplyscan/internal/cli\t1.049s\n" +
+				"test\tUNKNOWN STEP\t2026-03-16T13:37:24.1037868Z ok  \tgithub.com/undont/supplyscan/internal/scanner\t166.754s",
 			want: []float64{1.047, 1.049, 166.754},
 		},
 		{

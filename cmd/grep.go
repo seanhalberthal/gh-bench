@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/seanhalberthal/gh-bench/internal/runner"
+	"github.com/undont/gh-bench/internal/runner"
 	"github.com/spf13/cobra"
 )
 

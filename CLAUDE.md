@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **gh-bench** is a Go CLI tool (GitHub CLI extension) for GitHub Actions CI benchmarking and failure extraction. It fetches workflow run logs, extracts numeric values for statistical analysis (`stats` command), and surfaces structured errors from failed runs using framework-aware parsers (`failures` command).
 
-Module: `github.com/seanhalberthal/gh-bench` · Go 1.26.1
+Module: `github.com/undont/gh-bench` · Go 1.26.1
 
 ## Common Commands
 
@@ -63,4 +63,4 @@ Global `--json` flag on root command switches output format.
 ### Key Patterns
 - **Executor injection**: `runner.Executor` is a package-level variable overridden in tests for deterministic, offline testing
 - **Plugin architecture**: new framework parsers implement `FrameworkParser` and get added to the `parsers` slice in `parser.go`
-- **Version injection**: `-X github.com/seanhalberthal/gh-bench/cmd.Version=$(VERSION)` via ldflags at build time
+- **Version injection**: `-X github.com/undont/gh-bench/cmd.Version=$(VERSION)` via ldflags at build time

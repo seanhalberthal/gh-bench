@@ -10,7 +10,7 @@ NC     := \033[0m
 # Build variables
 VERSION  ?= dev
 BINARY   := gh-bench
-LDFLAGS  := -s -w -X github.com/seanhalberthal/gh-bench/cmd.Version=$(VERSION)
+LDFLAGS  := -s -w -X github.com/undont/gh-bench/cmd.Version=$(VERSION)
 
 # Test variables
 FILTER   ?=

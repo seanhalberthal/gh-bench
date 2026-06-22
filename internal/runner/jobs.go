@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/seanhalberthal/gh-bench/internal/logutil"
+	"github.com/undont/gh-bench/internal/logutil"
 	"golang.org/x/sync/errgroup"
 )
 

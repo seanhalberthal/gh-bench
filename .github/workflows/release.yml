@@ -144,7 +144,7 @@ jobs:
             EXT=".exe"
           fi
           go build -trimpath \
-            -ldflags "-s -w -X github.com/seanhalberthal/gh-bench/cmd.Version=${VERSION}" \
+            -ldflags "-s -w -X github.com/undont/gh-bench/cmd.Version=${VERSION}" \
             -o "dist/gh-bench-${{ matrix.goos }}-${{ matrix.goarch }}${EXT}" .
 
       - uses: actions/upload-artifact@v4

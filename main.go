@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/seanhalberthal/gh-bench/cmd"
+	"github.com/undont/gh-bench/cmd"
 )
 
 func main() {
