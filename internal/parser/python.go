@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/seanhalberthal/gh-bench/internal/logutil"
+	"github.com/undont/gh-bench/internal/logutil"
 )
 
 // PythonParser detects and extracts failures from pytest output.

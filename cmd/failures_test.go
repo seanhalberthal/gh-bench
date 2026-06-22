@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/seanhalberthal/gh-bench/internal/runner"
+	"github.com/undont/gh-bench/internal/runner"
 )
 
 func TestFilterByOpenPRs(t *testing.T) {

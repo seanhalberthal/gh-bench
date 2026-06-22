@@ -6,7 +6,7 @@ import (
 
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/seanhalberthal/gh-bench/internal/config"
+	"github.com/undont/gh-bench/internal/config"
 	"github.com/spf13/cobra"
 )
 

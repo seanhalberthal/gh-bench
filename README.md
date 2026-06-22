@@ -12,12 +12,12 @@
 
 **Extract CI metrics and surface test failures from GitHub Actions logs.**
 
-[![CI](https://img.shields.io/github/actions/workflow/status/seanhalberthal/gh-bench/release.yml?style=flat&logo=githubactions&logoColor=white&label=CI)](https://github.com/seanhalberthal/gh-bench/actions)
-[![Release](https://img.shields.io/github/v/release/seanhalberthal/gh-bench?style=flat&logo=github&logoColor=white&color=D4880F)](https://github.com/seanhalberthal/gh-bench/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/undont/gh-bench/release.yml?style=flat&logo=githubactions&logoColor=white&label=CI)](https://github.com/undont/gh-bench/actions)
+[![Release](https://img.shields.io/github/v/release/undont/gh-bench?style=flat&logo=github&logoColor=white&color=D4880F)](https://github.com/undont/gh-bench/releases/latest)
 [![gh extension](https://img.shields.io/badge/gh-extension-D4880F?style=flat&logo=gnometerminal&logoColor=white)](https://cli.github.com/manual/gh_extension)
 [![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?style=flat&logo=go&logoColor=white)](https://go.dev)
-[![macOS](https://img.shields.io/badge/macOS-6e7681?style=flat&logo=apple&logoColor=white)](https://github.com/seanhalberthal/gh-bench/releases)
-[![Linux](https://img.shields.io/badge/Linux-6e7681?style=flat&logo=linux&logoColor=white)](https://github.com/seanhalberthal/gh-bench/releases)
+[![macOS](https://img.shields.io/badge/macOS-6e7681?style=flat&logo=apple&logoColor=white)](https://github.com/undont/gh-bench/releases)
+[![Linux](https://img.shields.io/badge/Linux-6e7681?style=flat&logo=linux&logoColor=white)](https://github.com/undont/gh-bench/releases)
 
 [Quick Start](#quick-start) · [Commands](#commands) · [Framework Support](#framework-support) · [Configuration](#configuration) · [Examples](#examples)
 
@@ -31,7 +31,7 @@ A [`gh`](https://cli.github.com) CLI extension. `gh bench stats` pulls numeric v
 
 ```bash
 # Install
-gh extension install seanhalberthal/gh-bench
+gh extension install undont/gh-bench
 
 # Aggregate a metric across recent runs
 gh bench stats --workflow ci.yml --pattern 'duration=(?P<ms>[0-9.]+)ms'
@@ -206,7 +206,7 @@ $ gh bench failures --runs 23341983210 --json | jq '.[].failures[].test_name'
 ## Building from Source
 
 ```bash
-git clone https://github.com/seanhalberthal/gh-bench
+git clone https://github.com/undont/gh-bench
 cd gh-bench
 make build      # Build the binary
 make install    # Build and install as gh extension

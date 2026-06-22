@@ -1,4 +1,4 @@
-module github.com/seanhalberthal/gh-bench
+module github.com/undont/gh-bench
 
 go 1.26.1
 

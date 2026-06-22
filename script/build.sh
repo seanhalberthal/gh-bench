@@ -5,6 +5,6 @@ set -e
 # Used by the gh extension precompile action.
 
 VERSION="${GH_BENCH_VERSION:-dev}"
-LDFLAGS="-s -w -X github.com/seanhalberthal/gh-bench/cmd.Version=${VERSION}"
+LDFLAGS="-s -w -X github.com/undont/gh-bench/cmd.Version=${VERSION}"
 
 go build -trimpath -ldflags "${LDFLAGS}" -o gh-bench .
