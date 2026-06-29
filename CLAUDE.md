@@ -42,7 +42,8 @@ Global `--json` flag on root command switches output format.
 
 **`internal/parser/`** — Framework-specific test failure parsers
 - `FrameworkParser` interface: `Name()`, `Detect(logs)`, `Extract(logs)`
-- Detection order: DotNet → Go → Vitest → Fallback (first match wins)
+- Detection order: DotNet → Go → Vitest → Python → Generic (compiler/linter) → Fallback (first match wins)
+- The Generic parser handles eslint/tsc/golangci-lint/ruff/gcc diagnostics; it runs last so framework parsers win, and infers the tool per finding
 - Each parser uses regex to find failures, then looks backward/forward for error context
 - `AnnotateTimestamps()` enriches parsed failures with timestamps from raw (pre-stripped) log lines
 - Test data lives in `internal/parser/testdata/` (real CI log samples)
