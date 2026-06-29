@@ -24,6 +24,7 @@ var parsers = []FrameworkParser{
 	&GoParser{},
 	&VitestParser{},
 	&PythonParser{},
+	&GenericParser{},
 }
 
 // Parse runs auto-detection against the logs and extracts failures.

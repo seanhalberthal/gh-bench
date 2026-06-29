@@ -58,3 +58,26 @@ func TestStripTimestamps(t *testing.T) {
 		t.Errorf("StripTimestamps() = %q, want %q", got, want)
 	}
 }
+
+func TestStripANSI(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"sgr colour codes", "\x1b[36;1mmake lint\x1b[0m", "make lint"},
+		{"reset only", "done\x1b[0m", "done"},
+		{"erase line", "progress\x1b[2K", "progress"},
+		{"cursor move", "\x1b[1Gline", "line"},
+		{"no ansi", "plain text", "plain text"},
+		{"interleaved", "\x1b[31m✖\x1b[39m 1 problem", "✖ 1 problem"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := StripANSI(tt.input); got != tt.want {
+				t.Errorf("StripANSI(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}

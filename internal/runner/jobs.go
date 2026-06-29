@@ -141,8 +141,8 @@ func assembleStepResults(toFetch []jobSteps, logs []logPair) []StepResult {
 		for _, step := range js.steps {
 			out = append(out, StepResult{
 				Name:    step.Name,
-				Log:     segmentByStep(logs[i].clean, step.Name),
-				RawLog:  segmentByStep(logs[i].raw, step.Name),
+				Log:     segmentByStep(logs[i].clean, step.Name, js.info.Steps),
+				RawLog:  segmentByStep(logs[i].raw, step.Name, js.info.Steps),
 				Attempt: js.info.Attempt,
 			})
 		}
@@ -221,36 +221,54 @@ func fetchJobsFromRunView(runID string) ([]jobInfo, error) {
 	return infos, nil
 }
 
-// segmentByStep extracts the log section for a specific step using
-// GitHub Actions ##[group] / ##[endgroup] markers. Falls back to
-// the full log when no matching markers are found.
-func segmentByStep(log, stepName string) string {
-	groupPrefix := "##[group]"
-	endGroup := "##[endgroup]"
+// segmentByStep extracts the log section for a specific step.
+//
+// GitHub Actions wraps only a step's command echo and shell line inside the
+// "##[group]Run <step>" header; the step's real stdout/stderr is emitted at
+// top level after the matching ##[endgroup]. Capturing therefore runs from
+// the matched header until the next sibling step's header, not the first
+// ##[endgroup]. Sibling headers are recognised by matching their label
+// against allSteps; group markers with non-matching labels are nested groups
+// (e.g. composite actions) whose content belongs to the current step.
+//
+// Falls back to the full log when the step's header is not found.
+func segmentByStep(log, stepName string, allSteps []Step) string {
+	const groupPrefix = "##[group]"
+	const endGroup = "##[endgroup]"
 
-	lower := strings.ToLower(stepName)
+	target := strings.ToLower(strings.TrimSpace(stepName))
+	boundaries := make(map[string]bool, len(allSteps))
+	for _, s := range allSteps {
+		if n := strings.ToLower(strings.TrimSpace(s.Name)); n != "" && n != target {
+			boundaries[n] = true
+		}
+	}
+
 	var capturing bool
 	var b strings.Builder
 
 	for line := range strings.SplitSeq(log, "\n") {
 		if strings.HasPrefix(line, groupPrefix) {
-			label := line[len(groupPrefix):]
-			if strings.ToLower(strings.TrimSpace(label)) == lower {
-				capturing = true
+			label := strings.ToLower(strings.TrimSpace(line[len(groupPrefix):]))
+			if !capturing {
+				if label == target {
+					capturing = true
+				}
 				continue
-			} else if capturing {
-				// Entered a different step's group — stop capturing.
-				break
 			}
-			continue
+			if boundaries[label] {
+				break // next sibling step — stop
+			}
+			continue // nested group marker — skip marker, keep its content
 		}
 		if line == endGroup {
-			if capturing {
-				break
-			}
-			continue
+			continue // skip every endgroup marker; output follows them
 		}
 		if capturing {
+			// post-job cleanup runs after every step; it is never step output.
+			if strings.TrimSpace(line) == "Post job cleanup." {
+				break
+			}
 			if b.Len() > 0 {
 				b.WriteByte('\n')
 			}
@@ -259,7 +277,7 @@ func segmentByStep(log, stepName string) string {
 	}
 
 	if b.Len() == 0 {
-		return log // no markers found — fall back to full log
+		return log // step header not found — fall back to full log
 	}
 	return b.String()
 }
@@ -277,6 +295,7 @@ func fetchJobLog(_ context.Context, jobID, runID int64) (logPair, error) {
 	// Returns plain text — no tab-prefixed formatting, but still has timestamps.
 	log, err := Executor.Run("api", "repos/{owner}/{repo}/actions/jobs/"+strconv.FormatInt(jobID, 10)+"/logs")
 	if err == nil {
+		log = logutil.StripANSI(log)
 		return logPair{clean: logutil.StripTimestamps(log), raw: log}, nil
 	}
 
@@ -287,7 +306,8 @@ func fetchJobLog(_ context.Context, jobID, runID int64) (logPair, error) {
 		return logPair{}, fmt.Errorf("fetching log: %w", err)
 	}
 
-	// Strip tab-delimited prefixes; preserve timestamps in raw version.
+	// Strip ANSI, then tab-delimited prefixes; preserve timestamps in raw version.
+	log = logutil.StripANSI(log)
 	return logPair{clean: stripLogPrefixes(log), raw: stripTabPrefixesOnly(log)}, nil
 }
 
