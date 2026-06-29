@@ -29,8 +29,6 @@ var (
 	ghErrorRe = regexp.MustCompile(`^##\[error\](.+)`)
 	// Shell script source lines (expanded by set -x or ##[group] in GitHub Actions).
 	shellScriptRe = regexp.MustCompile(`^(if\s+\[|then$|else$|fi$|done$|do$|exit\s+\d|echo\s+"[^"]*"$|#\s)`)
-	// ANSI colour code escape sequences (e.g. [36;1m...[0m).
-	ansiEscapeRe = regexp.MustCompile(`^\[[\d;]+m`)
 	// GitHub Actions runner commands: [command]/usr/bin/git ...
 	ghCommandRe = regexp.MustCompile(`^\[command\]`)
 	// GitHub Actions cleanup/lifecycle lines.
@@ -54,9 +52,6 @@ func isBoilerplate(line string) bool {
 		return true
 	}
 	if shellScriptRe.MatchString(trimmed) {
-		return true
-	}
-	if ansiEscapeRe.MatchString(trimmed) {
 		return true
 	}
 	if ghCommandRe.MatchString(trimmed) {

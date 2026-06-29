@@ -11,6 +11,16 @@ import (
 // immediately followed by content without a separator.
 var TimestampRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z ?`)
 
+// ansiRe matches ANSI CSI escape sequences: ESC [ params intermediates final.
+// Covers SGR colour codes (…m) plus erase/cursor sequences (…K, …G) that CI
+// tools emit for progress output.
+var ansiRe = regexp.MustCompile("\x1b\\[[0-9;?]*[ -/]*[@-~]")
+
+// StripANSI removes ANSI CSI escape sequences from a string.
+func StripANSI(s string) string {
+	return ansiRe.ReplaceAllString(s, "")
+}
+
 // StripTimestamp removes a GitHub Actions timestamp prefix from a single line.
 func StripTimestamp(line string) string {
 	if loc := TimestampRe.FindStringIndex(line); loc != nil {

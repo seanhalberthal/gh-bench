@@ -306,26 +306,44 @@ func TestGetFailedSteps_FallbackRawLogPreservesTimestamps(t *testing.T) {
 }
 
 func TestSegmentByStep(t *testing.T) {
-	log := "##[group]Run tests\nFAIL: TestFoo\nerror at line 42\n##[endgroup]\n##[group]Generate coverage\ncoverage: 80%\n##[endgroup]"
+	// Realistic layout: a step's command echo + shell line sit inside the
+	// "##[group]Run <step>" header, but the real output is emitted after the
+	// matching ##[endgroup]. A composite action emits its own nested group.
+	steps := []Step{{Name: "Run tests"}, {Name: "Generate coverage"}}
+	log := "##[group]Run tests\nmake test\nshell: /usr/bin/bash -e {0}\n##[endgroup]\n" +
+		"FAIL: TestFoo\nerror at line 42\n" +
+		"##[group]Run nested-setup\ninternal noise\n##[endgroup]\n" +
+		"more real output\n" +
+		"##[group]Generate coverage\ngo tool cover\nshell: /usr/bin/bash -e {0}\n##[endgroup]\n" +
+		"coverage: 80%"
 
-	t.Run("extracts matching step", func(t *testing.T) {
-		got := segmentByStep(log, "Run tests")
-		want := "FAIL: TestFoo\nerror at line 42"
-		if got != want {
-			t.Errorf("got %q, want %q", got, want)
+	t.Run("captures output after the header endgroup", func(t *testing.T) {
+		got := segmentByStep(log, "Run tests", steps)
+		if !strings.Contains(got, "FAIL: TestFoo") || !strings.Contains(got, "error at line 42") {
+			t.Errorf("expected real step output, got %q", got)
+		}
+		if strings.Contains(got, "coverage: 80%") {
+			t.Errorf("should not bleed into the next step, got %q", got)
 		}
 	})
 
-	t.Run("extracts second step", func(t *testing.T) {
-		got := segmentByStep(log, "Generate coverage")
-		want := "coverage: 80%"
+	t.Run("keeps nested composite-group content", func(t *testing.T) {
+		got := segmentByStep(log, "Run tests", steps)
+		if !strings.Contains(got, "internal noise") || !strings.Contains(got, "more real output") {
+			t.Errorf("nested group content should be retained, got %q", got)
+		}
+	})
+
+	t.Run("stops at the next sibling step", func(t *testing.T) {
+		got := segmentByStep(log, "Generate coverage", steps)
+		want := "go tool cover\nshell: /usr/bin/bash -e {0}\ncoverage: 80%"
 		if got != want {
 			t.Errorf("got %q, want %q", got, want)
 		}
 	})
 
 	t.Run("case insensitive match", func(t *testing.T) {
-		got := segmentByStep(log, "run tests")
+		got := segmentByStep(log, "run tests", steps)
 		if !strings.Contains(got, "FAIL: TestFoo") {
 			t.Errorf("expected case-insensitive match, got %q", got)
 		}
@@ -333,14 +351,14 @@ func TestSegmentByStep(t *testing.T) {
 
 	t.Run("no markers falls back to full log", func(t *testing.T) {
 		plain := "just some log output\nno markers here"
-		got := segmentByStep(plain, "Run tests")
+		got := segmentByStep(plain, "Run tests", steps)
 		if got != plain {
 			t.Errorf("expected full log fallback, got %q", got)
 		}
 	})
 
 	t.Run("no matching step falls back to full log", func(t *testing.T) {
-		got := segmentByStep(log, "Nonexistent step")
+		got := segmentByStep(log, "Nonexistent step", steps)
 		if got != log {
 			t.Errorf("expected full log fallback, got %q", got)
 		}
