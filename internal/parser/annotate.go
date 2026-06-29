@@ -72,6 +72,16 @@ func anchorFor(f *Failure) string {
 		// after the last "::". The FAILED summary line contains both the
 		// full path and the test name, so matching on TestName is sufficient.
 		return f.TestName
+	case "eslint":
+		// stylish rows carry the rule (TestName); the file path lives on a
+		// separate header line, so Location is not present on the row.
+		return f.TestName
+	case "tsc", "golangci-lint", "ruff", "python", "gcc/clang", "compiler/linter":
+		// each diagnostic is a single line containing file:line:col.
+		if f.Location != "" {
+			return f.Location
+		}
+		return f.TestName
 	default:
 		return ""
 	}

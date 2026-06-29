@@ -1,0 +1,9 @@
+make lint
+$ eslint .
+/home/runner/work/tattoo-studio/tattoo-studio/apps/mobile/app/_layout.tsx
+  23:54  error  This assertion is unnecessary since the receiver accepts the original type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+  41:7   warning  'foo' is assigned a value but never used  @typescript-eslint/no-unused-vars
+✖ 2 problems (1 error, 1 warning)
+  1 error and 0 warnings potentially fixable with the `--fix` option.
+error: script "lint" exited with code 1
+make: *** [Makefile:371: lint] Error 1
